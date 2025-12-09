@@ -33,7 +33,8 @@
   "submit": {
     "production": {
       "android": {
-        "buildType": "apk"
+        "serviceAccountKeyPath": "./google-services.json",
+        "track": "internal"
       },
       "ios": {
         "appleId": "your-apple-id@example.com",
