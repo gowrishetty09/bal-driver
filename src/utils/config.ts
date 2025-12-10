@@ -9,7 +9,7 @@ const fromEnv = (key: string, fallback?: string) => {
 };
 
 export const API_BASE_URL: string =
-    process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'http://192.168.0.144:3000';
+    process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://bestaerolimo.online/api';
 
 export const USE_MOCKS: boolean =
     (process.env.EXPO_PUBLIC_USE_MOCKS ?? '').toLowerCase() === 'true' || Boolean(extra.useMocks);
