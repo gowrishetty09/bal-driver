@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Location from 'expo-location';
 
 import { Screen } from '../../components/Screen';
+import { FeedbackPrompt } from '../../components/FeedbackPrompt';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { ActiveJobsStackParamList, HistoryJobsStackParamList, UpcomingJobsStackParamList } from '../../types/navigation';
@@ -59,6 +60,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const trackerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopLocationUpdates = useCallback(() => {
@@ -142,6 +144,11 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setJob(updatedJob);
         emitJobRefresh();
         showSuccessToast('Status updated', `Ride marked as ${STATUS_LABELS[nextStatus]}`);
+
+        // Show feedback prompt after completing a trip
+        if (nextStatus === 'COMPLETED') {
+          setTimeout(() => setShowFeedbackPrompt(true), 1000);
+        }
 
         if (nextStatus === 'EN_ROUTE') {
           await startLocationUpdates();
@@ -356,6 +363,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Feedback Prompt - shown after completing a trip */}
+      <FeedbackPrompt
+        visible={showFeedbackPrompt}
+        onClose={() => setShowFeedbackPrompt(false)}
+        bookingId={job?.id}
+        title="How was this trip?"
+      />
     </Screen>
   );
 };

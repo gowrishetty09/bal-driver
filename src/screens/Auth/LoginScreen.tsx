@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -56,8 +57,11 @@ export const LoginScreen: React.FC = () => {
       keyboardVerticalOffset={64}
     >
       <Screen contentContainerStyle={styles.container} edges={['top','bottom']}>
-        <Text style={styles.title}>Driver Console</Text>
-        <Text style={styles.subtitle}>Enter your credentials to access current and upcoming rides.</Text>
+        <Image
+          source={require('../../../assets/horizantal-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Email</Text>
@@ -105,17 +109,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  title: {
-    fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: typography.body,
-    color: colors.muted,
-    textAlign: 'center',
-    marginBottom: 32,
+  logo: {
+    width: 220,
+    height: 60,
+    marginBottom: 40,
   },
   inputGroup: {
     width: '100%',

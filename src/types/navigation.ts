@@ -34,10 +34,22 @@ export type MainTabParamList = {
 
 export type ProfileStackParamList = {
     DriverProfile: undefined;
+    Feedback: FeedbackParams | undefined;
+};
+
+export type FeedbackParams = {
+    preSelectedCategory?: 'SERVICE_QUALITY' | 'DRIVER_BEHAVIOR' | 'VEHICLE_CONDITION' | 'APP_EXPERIENCE' | 'PRICING' | 'BOOKING_PROCESS' | 'OTHER';
+    bookingId?: string;
+    isReportIssue?: boolean;
+};
+
+export type FeedbackStackParamList = {
+    Feedback: FeedbackParams | undefined;
 };
 
 export type SupportStackParamList = {
     SupportTickets: undefined;
     SupportTicketDetails: { ticketId: string };
     NewSupportTicket: undefined;
+    Feedback: FeedbackParams | undefined;
 };

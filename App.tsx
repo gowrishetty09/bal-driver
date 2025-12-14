@@ -8,6 +8,12 @@ import { AuthProvider } from './src/context/AuthContext';
 import { LocationProvider } from './src/context/LocationContext';
 import { SosProvider } from './src/context/SosContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { useFeedbackSync } from './src/hooks/useFeedbackSync';
+
+const FeedbackSyncProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  useFeedbackSync();
+  return <>{children}</>;
+};
 
 export default function App() {
   return (
@@ -16,7 +22,9 @@ export default function App() {
         <AuthProvider>
           <LocationProvider>
             <SosProvider>
-              <AppNavigator />
+              <FeedbackSyncProvider>
+                <AppNavigator />
+              </FeedbackSyncProvider>
             </SosProvider>
           </LocationProvider>
         </AuthProvider>

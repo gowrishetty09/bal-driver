@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Screen } from '../../components/Screen';
 import { colors } from '../../theme/colors';
@@ -59,9 +60,14 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
     <Screen>
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Support Tickets</Text>
-        <Pressable style={styles.newTicketButton} onPress={() => navigation.navigate('NewSupportTicket')}>
-          <Text style={styles.newTicketLabel}>New ticket</Text>
-        </Pressable>
+        <View style={styles.headerButtons}>
+          <Pressable style={styles.feedbackButton} onPress={() => navigation.navigate('Feedback', {})}>
+            <Ionicons name="star-outline" size={18} color={colors.brandGold} />
+          </Pressable>
+          <Pressable style={styles.newTicketButton} onPress={() => navigation.navigate('NewSupportTicket')}>
+            <Text style={styles.newTicketLabel}>New ticket</Text>
+          </Pressable>
+        </View>
       </View>
       {isLoadingList && tickets.length === 0 ? (
         <View style={styles.loaderContainer}>
@@ -89,10 +95,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   heading: {
     fontSize: typography.heading,
     color: colors.text,
     fontFamily: typography.fontFamilyBold,
+  },
+  feedbackButton: {
+    backgroundColor: colors.brandNavy,
+    padding: 10,
+    borderRadius: 12,
   },
   newTicketButton: {
     backgroundColor: colors.brandNavy,

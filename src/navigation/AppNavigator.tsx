@@ -22,10 +22,12 @@ import { DriverProfileScreen } from '../screens/Profile/DriverProfileScreen';
 import { SupportListScreen } from '../screens/Support/SupportListScreen';
 import { SupportTicketDetailsScreen } from '../screens/Support/SupportTicketDetailsScreen';
 import { SupportNewTicketScreen } from '../screens/Support/SupportNewTicketScreen';
+import { FeedbackScreen } from '../screens/Feedback/FeedbackScreen';
 import { useAuth } from '../hooks/useAuth';
 import {
   ActiveJobsStackParamList,
   AuthStackParamList,
+  FeedbackStackParamList,
   HistoryJobsStackParamList,
   MainTabParamList,
   ProfileStackParamList,
@@ -138,15 +140,30 @@ const HistoryJobsStackNavigator = () => {
   );
 };
 
-const ProfileStackNavigator = () => (
-  <ProfileStack.Navigator screenOptions={stackScreenOptions}>
-    <ProfileStack.Screen
-      name="DriverProfile"
-      component={DriverProfileScreen}
-      options={{ title: 'Profile' }}
-    />
-  </ProfileStack.Navigator>
-);
+const ProfileStackNavigator = () => {
+  const { logout } = useAuth();
+
+  return (
+    <ProfileStack.Navigator screenOptions={stackScreenOptions}>
+      <ProfileStack.Screen
+        name="DriverProfile"
+        component={DriverProfileScreen}
+        options={{
+          title: 'Profile',
+          headerRight: () => <HeaderActions onLogout={logout} />,
+        }}
+      />
+      <ProfileStack.Screen
+        name="Feedback"
+        component={FeedbackScreen}
+        options={{
+          title: 'Share Feedback',
+          headerRight: () => <HeaderActions onLogout={logout} />,
+        }}
+      />
+    </ProfileStack.Navigator>
+  );
+};
 
 const SupportStackNavigator = () => {
   const { logout } = useAuth();
@@ -174,6 +191,14 @@ const SupportStackNavigator = () => {
         component={SupportNewTicketScreen}
         options={{
           title: 'New ticket',
+          headerRight: () => <HeaderActions onLogout={logout} />,
+        }}
+      />
+      <SupportStack.Screen
+        name="Feedback"
+        component={FeedbackScreen}
+        options={{
+          title: 'Share Feedback',
           headerRight: () => <HeaderActions onLogout={logout} />,
         }}
       />

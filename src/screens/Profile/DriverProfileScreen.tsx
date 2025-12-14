@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Screen } from '../../components/Screen';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,6 +14,7 @@ import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { getErrorMessage } from '../../utils/errors';
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
+import { ProfileStackParamList } from '../../types/navigation';
 
 const friendlyTime = (timestamp?: string | null) => {
   if (!timestamp) {
@@ -42,6 +46,7 @@ const friendlyTime = (timestamp?: string | null) => {
 
 export const DriverProfileScreen: React.FC = () => {
   const { user, logout, updateUserProfile } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { permissionStatus, requestPermission, isSharingLocation, lastSentAt, lastKnownCoordinates } =
     useLocationService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -200,6 +205,30 @@ export const DriverProfileScreen: React.FC = () => {
           {isLoggingOut ? <ActivityIndicator color="#fff" /> : <Text style={styles.logoutLabel}>Logout</Text>}
         </Pressable>
       </View>
+
+      {/* Feedback & Help Card */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Feedback & Help</Text>
+        <Text style={styles.sectionSubtitle}>Help us improve your experience</Text>
+        
+        <Pressable 
+          style={styles.feedbackButton} 
+          onPress={() => navigation.navigate('Feedback', {})}
+        >
+          <Ionicons name="star-outline" size={20} color={colors.brandGold} />
+          <Text style={styles.feedbackButtonLabel}>Give Feedback</Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.brandGold} style={styles.chevron} />
+        </Pressable>
+        
+        <Pressable 
+          style={styles.feedbackButton} 
+          onPress={() => navigation.navigate('Feedback', { isReportIssue: true, preSelectedCategory: 'APP_EXPERIENCE' })}
+        >
+          <Ionicons name="warning-outline" size={20} color={colors.danger} />
+          <Text style={[styles.feedbackButtonLabel, styles.reportIssueLabel]}>Report an Issue</Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} style={styles.chevron} />
+        </Pressable>
+      </View>
     </Screen>
   );
 };
@@ -290,5 +319,27 @@ const styles = StyleSheet.create({
   savedLocationRow: {
     marginTop: 12,
     gap: 4,
+  },
+  feedbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.brandNavy,
+    gap: 12,
+  },
+  feedbackButtonLabel: {
+    flex: 1,
+    color: colors.brandGold,
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  reportIssueLabel: {
+    color: colors.text,
+  },
+  chevron: {
+    marginLeft: 'auto',
   },
 });

@@ -4,7 +4,7 @@
     "slug": "bal-driver",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/AppIcons/playstore.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.bal.driver",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/AppIcons/playstore.png",
         "backgroundColor": "#151e2d"
       },
       "edgeToEdgeEnabled": false,
