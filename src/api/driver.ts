@@ -282,3 +282,34 @@ const mockLogin = (_payload: LoginPayload): AuthenticatedDriverPayload => ({
     tokens: mockTokens(),
     user: mockUser,
 });
+
+/**
+ * Device token registration payload for push notifications
+ */
+export type RegisterDeviceTokenPayload = {
+    token: string;
+    platform: 'android' | 'ios';
+    role: 'DRIVER';
+};
+
+export type RegisterDeviceTokenResponse = {
+    success: boolean;
+    message?: string;
+};
+
+/**
+ * Register device FCM token with the backend
+ * This allows the server to send push notifications to this device
+ */
+export const registerDeviceToken = async (payload: RegisterDeviceTokenPayload): Promise<RegisterDeviceTokenResponse> => {
+    try {
+        const { data } = await apiClient.post<RegisterDeviceTokenResponse>('/notifications/register-device', payload);
+        return data;
+    } catch (error) {
+        if (shouldUseMocks()) {
+            return { success: true, message: 'Device token registered (mock)' };
+        }
+        console.warn('Failed to register device token', error);
+        throw error;
+    }
+};

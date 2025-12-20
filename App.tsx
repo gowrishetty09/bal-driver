@@ -7,6 +7,7 @@ import Toast from 'react-native-toast-message';
 import { AuthProvider } from './src/context/AuthContext';
 import { LocationProvider } from './src/context/LocationContext';
 import { SosProvider } from './src/context/SosContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useFeedbackSync } from './src/hooks/useFeedbackSync';
 
@@ -20,13 +21,15 @@ export default function App() {
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
         <AuthProvider>
-          <LocationProvider>
-            <SosProvider>
-              <FeedbackSyncProvider>
-                <AppNavigator />
-              </FeedbackSyncProvider>
-            </SosProvider>
-          </LocationProvider>
+          <NotificationProvider>
+            <LocationProvider>
+              <SosProvider>
+                <FeedbackSyncProvider>
+                  <AppNavigator />
+                </FeedbackSyncProvider>
+              </SosProvider>
+            </LocationProvider>
+          </NotificationProvider>
         </AuthProvider>
         <Toast />
       </SafeAreaProvider>
