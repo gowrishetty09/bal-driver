@@ -3,7 +3,7 @@
  */
 import { Platform, Vibration } from 'react-native';
 import notifee, { AndroidImportance, AndroidChannel, AuthorizationStatus } from 'react-native-notifee';
-import { RemoteMessage, NotificationType, NewRideNotification, RideCancelledNotification, SosMessageNotification } from '../types/notifications';
+import { RemoteMessage, NotificationType, NewRideNotification, RideCancelledNotification, SosMessageNotification, AdminReassignmentNotification } from '../types/notifications';
 
 /**
  * Initialize Android notification channels for different notification types
@@ -44,6 +44,17 @@ export const initializeNotificationChannels = async (): Promise<void> => {
             sound: 'default',
             vibration: true,
             lightColor: '#FF0000',
+        } as AndroidChannel);
+
+        // Channel for admin updates (high priority)
+        await notifee.createChannel({
+            id: 'admin-updates',
+            name: 'Admin Updates',
+            description: 'Administrative notifications and reassignments',
+            importance: AndroidImportance.HIGH,
+            sound: 'default',
+            vibration: true,
+            lightColor: '#0066CC',
         } as AndroidChannel);
 
         console.log('Notification channels initialized');
@@ -132,6 +143,19 @@ export const displayNotification = async (
                     },
                 };
                 break;
+            case 'ADMIN_REASSIGNMENT':
+                channelId = 'admin-updates';
+                android = {
+                    channelId: 'admin-updates',
+                    sound: 'default',
+                    vibrate: [0, 100, 50, 100, 50, 100],
+                    priority: 'high',
+                    color: '#0066CC',
+                    pressAction: {
+                        id: 'default',
+                    },
+                };
+                break;
         }
 
         await notifee.displayNotification({
@@ -174,6 +198,10 @@ export const triggerVibration = (notificationType: NotificationType): void => {
                 // Urgent vibration pattern for SOS (rapid pulses)
                 Vibration.vibrate([50, 50, 50, 50, 50, 50, 50, 50], false);
                 break;
+            case 'ADMIN_REASSIGNMENT':
+                // Moderate vibration pattern for admin updates
+                Vibration.vibrate([100, 50, 100, 50, 100], false);
+                break;
         }
     } catch (error) {
         console.warn('Failed to trigger vibration:', error);
@@ -189,7 +217,7 @@ export const getNotificationType = (data?: Record<string, string | number | bool
     }
 
     const type = data.notificationType;
-    if (type === 'NEW_RIDE' || type === 'RIDE_CANCELLED' || type === 'SOS_MESSAGE') {
+    if (type === 'NEW_RIDE' || type === 'RIDE_CANCELLED' || type === 'SOS_MESSAGE' || type === 'ADMIN_REASSIGNMENT') {
         return type;
     }
 
@@ -210,6 +238,7 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
     switch (notificationType) {
         case 'NEW_RIDE':
         case 'RIDE_CANCELLED':
+        case 'ADMIN_REASSIGNMENT':
             // Navigate to active jobs with specific job details
             return {
                 screen: 'ActiveJobsTab',

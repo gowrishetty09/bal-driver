@@ -2,7 +2,7 @@
  * Firebase Cloud Messaging Notification Types
  */
 
-export type NotificationType = 'NEW_RIDE' | 'RIDE_CANCELLED' | 'SOS_MESSAGE';
+export type NotificationType = 'NEW_RIDE' | 'RIDE_CANCELLED' | 'SOS_MESSAGE' | 'ADMIN_REASSIGNMENT';
 
 export type FCMNotificationPayload = {
     notificationType: NotificationType;
@@ -42,6 +42,20 @@ export type SosMessageNotification = FCMNotificationPayload & {
         sosId: string;
         driverId: string;
         message: string;
+    };
+};
+
+export type AdminReassignmentNotification = FCMNotificationPayload & {
+    data: {
+        notificationType: 'ADMIN_REASSIGNMENT';
+        jobId: string;
+        jobReference: string;
+        previousDriverId?: string;
+        newDriverId: string;
+        reason: string;
+        passengerName: string;
+        pickupAddress: string;
+        dropoffAddress: string;
     };
 };
 
