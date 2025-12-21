@@ -1,10 +1,10 @@
 /**
- * Firebase Cloud Messaging Notification Types
+ * Expo Push Notification Types
  */
 
 export type NotificationType = 'NEW_RIDE' | 'RIDE_CANCELLED' | 'SOS_MESSAGE' | 'ADMIN_REASSIGNMENT';
 
-export type FCMNotificationPayload = {
+export type PushNotificationPayload = {
     notificationType: NotificationType;
     title: string;
     body: string;
@@ -14,7 +14,7 @@ export type FCMNotificationPayload = {
     };
 };
 
-export type NewRideNotification = FCMNotificationPayload & {
+export type NewRideNotification = PushNotificationPayload & {
     data: {
         notificationType: 'NEW_RIDE';
         jobId: string;
@@ -27,7 +27,7 @@ export type NewRideNotification = FCMNotificationPayload & {
     };
 };
 
-export type RideCancelledNotification = FCMNotificationPayload & {
+export type RideCancelledNotification = PushNotificationPayload & {
     data: {
         notificationType: 'RIDE_CANCELLED';
         jobId: string;
@@ -36,7 +36,7 @@ export type RideCancelledNotification = FCMNotificationPayload & {
     };
 };
 
-export type SosMessageNotification = FCMNotificationPayload & {
+export type SosMessageNotification = PushNotificationPayload & {
     data: {
         notificationType: 'SOS_MESSAGE';
         sosId: string;
@@ -45,7 +45,7 @@ export type SosMessageNotification = FCMNotificationPayload & {
     };
 };
 
-export type AdminReassignmentNotification = FCMNotificationPayload & {
+export type AdminReassignmentNotification = PushNotificationPayload & {
     data: {
         notificationType: 'ADMIN_REASSIGNMENT';
         jobId: string;

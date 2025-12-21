@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/AppIcons/playstore.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
     "notification": {
       "icon": "./assets/notifiy-icon.png",
       "color": "#151e2d"
@@ -34,7 +33,17 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-secure-store", "expo-location"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-location",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notifiy-icon.png",
+          "color": "#151e2d"
+        }
+      ]
+    ],
     "extra": {
       "apiBaseUrl": "https://bestaerolimo.online/api",
       "useMocks": false,

@@ -88,10 +88,7 @@ export const DriverProfileScreen: React.FC = () => {
   };
 
   const handleEditProfile = () => {
-    Alert.alert(
-      'Profile updates',
-      'Dispatch will optionally allow drivers to edit their details from here once the backend endpoint is live.'
-    );
+    showSuccessToast('Profile', 'Your profile is up to date.');
   };
 
   const handlePlaceSelect = async (prediction: { placeId: string; description: string }) => {
@@ -226,7 +223,7 @@ export const DriverProfileScreen: React.FC = () => {
         >
           <Ionicons name="warning-outline" size={20} color={colors.danger} />
           <Text style={[styles.feedbackButtonLabel, styles.reportIssueLabel]}>Report an Issue</Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.muted} style={styles.chevron} />
+          <Ionicons name="chevron-forward" size={20} color="#fff" style={styles.chevron} />
         </Pressable>
       </View>
     </Screen>
@@ -337,7 +334,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyMedium,
   },
   reportIssueLabel: {
-    color: colors.text,
+    color: '#fff',
   },
   chevron: {
     marginLeft: 'auto',

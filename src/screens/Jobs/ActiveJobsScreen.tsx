@@ -49,15 +49,24 @@ export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
   }, [loadJobs]);
 
   const renderItem = ({ item }: { item: DriverJob }) => (
-    <Pressable style={styles.card} onPress={() => navigation.navigate('JobDetails', { jobId: item.id })}>
-      <View>
+    <Pressable 
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} 
+      onPress={() => navigation.navigate('JobDetails', { jobId: item.id })}
+    >
+      <View style={styles.cardHeader}>
         <Text style={styles.jobId}>{item.reference}</Text>
-        <Text style={styles.passenger}>{item.passengerName}</Text>
-        <Text style={styles.route}>{`${item.pickup?.addressLine ?? '—'} → ${
-          item.dropoff?.addressLine ?? '—'
-        }`}</Text>
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusBadgeText}>{item.status}</Text>
+        </View>
       </View>
-      <Text style={styles.eta}>{new Date(item.scheduledTime).toLocaleTimeString()}</Text>
+      <Text style={styles.passenger}>{item.passengerName || 'Customer'}</Text>
+      <Text style={styles.route}>{`${item.pickup?.addressLine ?? '—'} → ${
+        item.dropoff?.addressLine ?? '—'
+      }`}</Text>
+      <View style={styles.cardFooter}>
+        <Text style={styles.eta}>{new Date(item.scheduledTime).toLocaleTimeString()}</Text>
+        <Text style={styles.tapHint}>Tap to view details →</Text>
+      </View>
     </Pressable>
   );
 
@@ -113,10 +122,36 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderColor: colors.border,
     borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardPressed: {
+    backgroundColor: colors.background,
+    transform: [{ scale: 0.98 }],
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    color: '#fff',
+    fontSize: typography.caption,
+    fontFamily: typography.fontFamilyMedium,
   },
   jobId: {
     fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyMedium,
+    fontFamily: typography.fontFamilyBold,
     color: colors.text,
   },
   passenger: {
@@ -129,10 +164,22 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     color: colors.muted,
   },
-  eta: {
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  eta: {
     fontSize: typography.body,
     color: colors.primary,
-    fontFamily: typography.fontFamilyMedium,
+    fontFamily: typography.fontFamilyBold,
+  },
+  tapHint: {
+    fontSize: typography.caption,
+    color: colors.muted,
   },
 });

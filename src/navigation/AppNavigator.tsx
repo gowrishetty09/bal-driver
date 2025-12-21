@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { enableScreens } from 'react-native-screens';
@@ -24,6 +24,7 @@ import { SupportTicketDetailsScreen } from '../screens/Support/SupportTicketDeta
 import { SupportNewTicketScreen } from '../screens/Support/SupportNewTicketScreen';
 import { FeedbackScreen } from '../screens/Feedback/FeedbackScreen';
 import { useAuth } from '../hooks/useAuth';
+import { useNotificationContext } from '../context/NotificationContext';
 import {
   ActiveJobsStackParamList,
   AuthStackParamList,
@@ -221,7 +222,7 @@ const MainTabsNavigator = () => (
     screenOptions={({ route }) => ({
       headerShown: false,
       tabBarActiveTintColor: colors.brandNavy,
-      tabBarInactiveTintColor: colors.brandNavy,
+      tabBarInactiveTintColor: 'rgba(21, 30, 45, 0.5)',
       tabBarStyle: styles.tabBar,
       tabBarLabelStyle: styles.tabBarLabel,
       tabBarIcon: ({ color, size }) => {
@@ -258,6 +259,26 @@ const MainTabsNavigator = () => (
   </Tabs.Navigator>
 );
 
+/**
+ * Component to handle pending navigation from push notifications
+ * Must be rendered inside NavigationContainer
+ */
+const NotificationNavigationHandler: React.FC = () => {
+  const navigation = useNavigation();
+  const { pendingNavigation, clearPendingNavigation } = useNotificationContext();
+
+  useEffect(() => {
+    if (pendingNavigation) {
+      console.log('Handling pending navigation:', pendingNavigation);
+      // @ts-ignore - navigation params vary by screen
+      navigation.navigate(pendingNavigation.screen, pendingNavigation.params);
+      clearPendingNavigation();
+    }
+  }, [pendingNavigation, navigation, clearPendingNavigation]);
+
+  return null;
+};
+
 export const AppNavigator = () => {
   const { isAuthenticated, isInitializing } = useAuth();
 
@@ -267,7 +288,14 @@ export const AppNavigator = () => {
 
   return (
     <NavigationContainer theme={appNavigationTheme}>
-      {isAuthenticated ? <MainTabsNavigator /> : <AuthStackNavigator />}
+      {isAuthenticated ? (
+        <>
+          <NotificationNavigationHandler />
+          <MainTabsNavigator />
+        </>
+      ) : (
+        <AuthStackNavigator />
+      )}
     </NavigationContainer>
   );
 };

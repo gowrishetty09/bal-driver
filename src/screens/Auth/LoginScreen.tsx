@@ -106,13 +106,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 40,
   },
   logo: {
     width: 220,
     height: 60,
-    marginBottom: 40,
+    marginBottom: 56,
+    marginTop: 20,
   },
   inputGroup: {
     width: '100%',

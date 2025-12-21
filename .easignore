@@ -16,6 +16,7 @@ node_modules/
 *.swp
 *.swo
 *~
+.expo
 
 # OS-generated files
 .DS_Store

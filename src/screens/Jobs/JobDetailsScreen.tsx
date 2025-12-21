@@ -267,7 +267,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer</Text>
-          <Text style={styles.customerName}>{job.passengerName}</Text>
+          <Text style={styles.customerName}>{job.passengerName || 'Customer'}</Text>
+          {job.passengerPhone ? (
+            <Text style={styles.customerContact}>{job.passengerPhone}</Text>
+          ) : null}
+          {job.passengerEmail ? (
+            <Text style={styles.customerContact}>{job.passengerEmail}</Text>
+          ) : null}
           <View style={styles.actionRow}>
             <Pressable style={styles.actionButton} onPress={handleCallPassenger}>
               <Text style={styles.actionLabel}>Call</Text>
@@ -280,6 +286,22 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ride Details</Text>
+          {(job.distanceKm !== undefined || job.durationMinutes !== undefined) && (
+            <View style={styles.distanceTimeRow}>
+              {job.distanceKm !== undefined && (
+                <View style={styles.distanceTimeItem}>
+                  <Text style={styles.distanceTimeValue}>{job.distanceKm.toFixed(1)} km</Text>
+                  <Text style={styles.distanceTimeLabel}>Distance</Text>
+                </View>
+              )}
+              {job.durationMinutes !== undefined && (
+                <View style={styles.distanceTimeItem}>
+                  <Text style={styles.distanceTimeValue}>{job.durationMinutes} min</Text>
+                  <Text style={styles.distanceTimeLabel}>Est. Time</Text>
+                </View>
+              )}
+            </View>
+          )}
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Estimated Fare</Text>
             <Text style={styles.metaValue}>{
@@ -387,13 +409,15 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 0,
+    paddingTop: 20,
+    paddingBottom: 32,
     gap: 16,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: 48,
   },
   jobId: {
     fontSize: typography.heading,
@@ -453,7 +477,13 @@ const styles = StyleSheet.create({
   },
   customerName: {
     fontSize: typography.subheading,
+    fontFamily: typography.fontFamilyMedium,
     color: colors.text,
+  },
+  customerContact: {
+    fontSize: typography.body,
+    color: colors.muted,
+    marginTop: 4,
   },
   actionRow: {
     flexDirection: 'row',
@@ -477,6 +507,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  distanceTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+  },
+  distanceTimeItem: {
+    alignItems: 'center',
+  },
+  distanceTimeValue: {
+    fontSize: typography.heading,
+    fontFamily: typography.fontFamilyBold,
+    color: colors.primary,
+  },
+  distanceTimeLabel: {
+    fontSize: typography.caption,
+    color: colors.muted,
+    marginTop: 4,
   },
   metaLabel: {
     fontSize: typography.body,
