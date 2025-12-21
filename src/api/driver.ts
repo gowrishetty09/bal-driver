@@ -90,11 +90,29 @@ const authHttp = axios.create({
 
 const shouldUseMocks = () => USE_MOCKS;
 
+type ErrorResponse = {
+    message?: string;
+    error?: string;
+    statusCode?: number;
+};
+
 export const loginDriver = async (payload: LoginPayload): Promise<AuthenticatedDriverPayload> => {
     try {
-        const { data } = await authHttp.post<LoginResponse>('/auth/login', payload);
-        const tokens = deriveSessionTokens(data, Date.now());
-        return { tokens, user: data.user };
+        const { data } = await authHttp.post<LoginResponse | ErrorResponse>('/auth/login', payload);
+
+        // Check if response is an error (backend returns 201 even for errors)
+        const errorData = data as ErrorResponse;
+        if (errorData.message && !('accessToken' in data)) {
+            throw new Error(errorData.message);
+        }
+
+        const loginData = data as LoginResponse;
+        if (!loginData.accessToken || !loginData.user) {
+            throw new Error('Invalid login response');
+        }
+
+        const tokens = deriveSessionTokens(loginData, Date.now());
+        return { tokens, user: loginData.user };
     } catch (error) {
         if (shouldUseMocks()) {
             return mockLogin(payload);

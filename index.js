@@ -1,5 +1,10 @@
 import { registerRootComponent } from 'expo';
 
+// Polyfill FormData for Hermes engine compatibility with axios
+if (typeof global.FormData === 'undefined') {
+    global.FormData = require('react-native/Libraries/Network/FormData');
+}
+
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
