@@ -13,11 +13,14 @@ export type LocationContextValue = {
   lastSentAt: string | null;
   lastKnownCoordinates: { latitude: number; longitude: number } | null;
   requestPermission: () => Promise<void>;
+  setHighFrequencyMode: (enabled: boolean) => void;
+  isHighFrequencyMode: boolean;
 };
 
 export const LocationContext = createContext<LocationContextValue | null>(null);
 
-const LOCATION_INTERVAL_MS = 30000;
+const LOCATION_INTERVAL_MS = 30000; // Normal: 30 seconds
+const HIGH_FREQUENCY_INTERVAL_MS = 10000; // Active ride: 10 seconds
 
 export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -28,8 +31,10 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [isHighFrequencyMode, setHighFrequencyModeState] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const highFrequencyRef = useRef(false);
 
   const stopInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -46,7 +51,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
 
     try {
       const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: highFrequencyRef.current ? Location.Accuracy.High : Location.Accuracy.Balanced,
       });
 
       const coords = {
@@ -63,14 +68,34 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     }
   }, [isAuthenticated, permissionStatus]);
 
-  const startInterval = useCallback(() => {
-    if (intervalRef.current || permissionStatus !== 'granted' || !isAuthenticated) {
+  const startInterval = useCallback((highFrequency = false) => {
+    // Clear existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    if (permissionStatus !== 'granted' || !isAuthenticated) {
       return;
     }
 
+    const intervalMs = highFrequency ? HIGH_FREQUENCY_INTERVAL_MS : LOCATION_INTERVAL_MS;
+    console.log(`[Location] Starting location updates every ${intervalMs / 1000}s (high frequency: ${highFrequency})`);
+    
     sendCurrentLocation();
-    intervalRef.current = setInterval(sendCurrentLocation, LOCATION_INTERVAL_MS);
+    intervalRef.current = setInterval(sendCurrentLocation, intervalMs);
   }, [isAuthenticated, permissionStatus, sendCurrentLocation]);
+
+  const setHighFrequencyMode = useCallback((enabled: boolean) => {
+    console.log(`[Location] High frequency mode: ${enabled}`);
+    highFrequencyRef.current = enabled;
+    setHighFrequencyModeState(enabled);
+    
+    // Restart interval with new frequency if we're currently sharing
+    if (permissionStatus === 'granted' && isAuthenticated) {
+      startInterval(enabled);
+    }
+  }, [isAuthenticated, permissionStatus, startInterval]);
 
   const evaluatePermission = useCallback(async () => {
     try {
@@ -117,7 +142,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         if (isAuthenticated && permissionStatus === 'granted') {
-          startInterval();
+          startInterval(highFrequencyRef.current);
         }
       }
 
@@ -145,8 +170,10 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       lastSentAt,
       lastKnownCoordinates,
       requestPermission,
+      setHighFrequencyMode,
+      isHighFrequencyMode,
     }),
-    [permissionStatus, isSharingLocation, lastSentAt, lastKnownCoordinates, requestPermission]
+    [permissionStatus, isSharingLocation, lastSentAt, lastKnownCoordinates, requestPermission, setHighFrequencyMode, isHighFrequencyMode]
   );
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;

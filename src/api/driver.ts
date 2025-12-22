@@ -38,6 +38,11 @@ export type LocationPoint = {
     landmark?: string;
 };
 
+export type Coordinates = {
+    lat: number;
+    lng: number;
+};
+
 export type DriverJob = {
     id: string;
     reference: string;
@@ -45,11 +50,14 @@ export type DriverJob = {
     type: JobType;
     pickup?: LocationPoint | null;
     dropoff?: LocationPoint | null;
-    paymentAmount: number;
+    pickupCoords?: Coordinates | null;
+    dropCoords?: Coordinates | null;
+    paymentAmount: number | null;
     paymentMethod?: string;
     paymentStatus?: string;
     passengerName: string;
     passengerPhone: string;
+    passengerEmail?: string;
     scheduledTime: string;
     notes?: string;
 };
@@ -202,6 +210,8 @@ type BackendJob = {
     rideType?: string;
     pickupLocation?: string | null;
     dropLocation?: string | null;
+    pickupCoords?: { lat: number; lng: number } | null;
+    dropCoords?: { lat: number; lng: number } | null;
     paymentStatus?: string;
     paymentMethod?: string;
     paymentAmount?: number;
@@ -217,11 +227,17 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     reference: j.vehicle?.registrationNo ?? j.id,
     status: j.status,
     type: listType,
-    pickup: j.pickupLocation ? { addressLine: j.pickupLocation } : undefined,
-    dropoff: j.dropLocation ? { addressLine: j.dropLocation } : undefined,
-    passengerName: j.guestName ?? '—',
-    passengerPhone: j.guestPhone ?? '—',
-    paymentAmount: j.paymentAmount ?? 0, // will render as '—' where applicable
+    pickup: j.pickupLocation && j.pickupLocation.trim() !== ''
+        ? { addressLine: j.pickupLocation }
+        : undefined,
+    dropoff: j.dropLocation && j.dropLocation.trim() !== ''
+        ? { addressLine: j.dropLocation }
+        : undefined,
+    pickupCoords: j.pickupCoords ?? undefined,
+    dropCoords: j.dropCoords ?? undefined,
+    passengerName: j.guestName && j.guestName.trim() !== '' ? j.guestName : 'Customer',
+    passengerPhone: j.guestPhone && j.guestPhone.trim() !== '' ? j.guestPhone : '',
+    paymentAmount: j.paymentAmount ?? null,
     paymentMethod: j.paymentMethod ?? undefined,
     paymentStatus: j.paymentStatus ?? undefined,
     scheduledTime: j.pickupTime ?? new Date().toISOString(),

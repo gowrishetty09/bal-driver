@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,10 +12,11 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as Location from 'expo-location';
 
 import { Screen } from '../../components/Screen';
 import { FeedbackPrompt } from '../../components/FeedbackPrompt';
+import { RideMapView } from '../../components/RideMapView';
+import { useLocationService } from '../../hooks/useLocationService';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { ActiveJobsStackParamList, HistoryJobsStackParamList, UpcomingJobsStackParamList } from '../../types/navigation';
@@ -23,7 +24,6 @@ import {
   DriverJobDetail,
   JobStatus,
   getDriverJobDetails,
-  sendLocation,
   updateDriverJobStatus,
 } from '../../api/driver';
 import { getErrorMessage } from '../../utils/errors';
@@ -47,6 +47,7 @@ const STATUS_TRANSITIONS: Partial<Record<JobStatus, JobStatus>> = {
 };
 
 const TERMINAL_STATUSES: JobStatus[] = ['COMPLETED', 'CANCELLED'];
+const ACTIVE_RIDE_STATUSES: JobStatus[] = ['EN_ROUTE', 'ARRIVED', 'PICKED_UP'];
 
 type CombinedStackParamList = ActiveJobsStackParamList & UpcomingJobsStackParamList & HistoryJobsStackParamList;
 
@@ -59,47 +60,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-  const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
-  const trackerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Use global location service
+  const { isSharingLocation, setHighFrequencyMode, isHighFrequencyMode, lastKnownCoordinates } = useLocationService();
 
-  const stopLocationUpdates = useCallback(() => {
-    if (trackerRef.current) {
-      clearInterval(trackerRef.current);
-      trackerRef.current = null;
-    }
-    setIsTrackingLocation(false);
-  }, []);
-
-  const startLocationUpdates = useCallback(async () => {
-    if (trackerRef.current) {
-      return;
-    }
-
-    const permissions = await Location.requestForegroundPermissionsAsync();
-    if (permissions.status !== 'granted') {
-      showErrorToast('Location', 'Permission required to share location with dispatch.');
-      return;
-    }
-
-    const sendCurrentLocation = async () => {
-      try {
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        await sendLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      } catch (error) {
-        console.warn('Unable to send location update', error);
-      }
-    };
-
-    await sendCurrentLocation();
-    trackerRef.current = setInterval(sendCurrentLocation, 10000);
-    setIsTrackingLocation(true);
-  }, []);
+  // Determine if map should be shown (active ride statuses only)
+  const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
 
   const fetchDetails = useCallback(async () => {
     try {
@@ -115,22 +82,32 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
   useEffect(() => {
     fetchDetails();
-    return () => stopLocationUpdates();
-  }, [fetchDetails, stopLocationUpdates]);
+  }, [fetchDetails]);
 
+  // Enable high-frequency location updates when on an active ride
   useEffect(() => {
     if (!job) {
       return;
     }
 
-    if (job.status === 'EN_ROUTE' && !trackerRef.current) {
-      startLocationUpdates();
+    const needsHighFrequency = ACTIVE_RIDE_STATUSES.includes(job.status);
+    
+    if (needsHighFrequency && !isHighFrequencyMode) {
+      setHighFrequencyMode(true);
     }
 
-    if (TERMINAL_STATUSES.includes(job.status)) {
-      stopLocationUpdates();
+    // Disable high frequency when ride is completed or cancelled
+    if (TERMINAL_STATUSES.includes(job.status) && isHighFrequencyMode) {
+      setHighFrequencyMode(false);
     }
-  }, [job, startLocationUpdates, stopLocationUpdates]);
+    
+    // Cleanup: disable high frequency when leaving this screen
+    return () => {
+      if (isHighFrequencyMode) {
+        setHighFrequencyMode(false);
+      }
+    };
+  }, [job, isHighFrequencyMode, setHighFrequencyMode]);
 
   const handleStatusUpdate = useCallback(
     async (nextStatus: JobStatus, reason?: string) => {
@@ -150,12 +127,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           setTimeout(() => setShowFeedbackPrompt(true), 1000);
         }
 
-        if (nextStatus === 'EN_ROUTE') {
-          await startLocationUpdates();
+        // Enable high frequency location updates when starting the ride
+        if (ACTIVE_RIDE_STATUSES.includes(nextStatus)) {
+          setHighFrequencyMode(true);
         }
 
+        // Disable high frequency when ride is completed/cancelled
         if (TERMINAL_STATUSES.includes(nextStatus)) {
-          stopLocationUpdates();
+          setHighFrequencyMode(false);
         }
       } catch (error) {
         const message = getErrorMessage(error, 'Failed to update status');
@@ -166,14 +145,15 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setCancelReason('');
       }
     },
-    [job, startLocationUpdates, stopLocationUpdates]
+    [job, setHighFrequencyMode]
   );
 
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
   const isJobTerminal = job ? TERMINAL_STATUSES.includes(job.status) : false;
 
   const handleCallPassenger = useCallback(() => {
-    if (!job) {
+    if (!job || !job.passengerPhone || job.passengerPhone.trim() === '') {
+      Alert.alert('No phone number', 'Customer phone number is not available.');
       return;
     }
     Linking.openURL(`tel:${job.passengerPhone}`).catch(() =>
@@ -182,10 +162,15 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   }, [job]);
 
   const handleWhatsApp = useCallback(() => {
-    if (!job) {
+    if (!job || !job.passengerPhone || job.passengerPhone.trim() === '') {
+      Alert.alert('No phone number', 'Customer phone number is not available.');
       return;
     }
     const digits = job.passengerPhone.replace(/[^\d+]/g, '');
+    if (!digits) {
+      Alert.alert('Invalid phone number', 'Customer phone number is invalid.');
+      return;
+    }
     const url = `https://wa.me/${digits.replace('+', '')}`;
     Linking.openURL(url).catch(() =>
       Alert.alert('WhatsApp unavailable', 'Install WhatsApp or try calling the customer instead.')
@@ -245,6 +230,18 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           </View>
         </View>
 
+        {/* Map with directions - shown only for active rides */}
+        {showMap && (
+          <RideMapView
+            driverLocation={lastKnownCoordinates}
+            pickupCoords={job.pickupCoords}
+            dropCoords={job.dropCoords}
+            status={job.status}
+            pickupAddress={pickupAddress}
+            dropAddress={dropoffAddress}
+          />
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pickup & Drop</Text>
           <View style={styles.locationRow}>
@@ -268,18 +265,40 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer</Text>
           <Text style={styles.customerName}>{job.passengerName || 'Customer'}</Text>
-          {job.passengerPhone ? (
+          {job.passengerPhone && job.passengerPhone.trim() !== '' ? (
             <Text style={styles.customerContact}>{job.passengerPhone}</Text>
-          ) : null}
+          ) : (
+            <Text style={[styles.customerContact, { color: colors.muted }]}>Phone not available</Text>
+          )}
           {job.passengerEmail ? (
             <Text style={styles.customerContact}>{job.passengerEmail}</Text>
           ) : null}
           <View style={styles.actionRow}>
-            <Pressable style={styles.actionButton} onPress={handleCallPassenger}>
-              <Text style={styles.actionLabel}>Call</Text>
+            <Pressable 
+              style={[
+                styles.actionButton, 
+                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionButtonDisabled
+              ]} 
+              onPress={handleCallPassenger}
+              disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+            >
+              <Text style={[
+                styles.actionLabel,
+                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionLabelDisabled
+              ]}>Call</Text>
             </Pressable>
-            <Pressable style={styles.actionButton} onPress={handleWhatsApp}>
-              <Text style={styles.actionLabel}>WhatsApp</Text>
+            <Pressable 
+              style={[
+                styles.actionButton,
+                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionButtonDisabled
+              ]} 
+              onPress={handleWhatsApp}
+              disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+            >
+              <Text style={[
+                styles.actionLabel,
+                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionLabelDisabled
+              ]}>WhatsApp</Text>
             </Pressable>
           </View>
         </View>
@@ -305,7 +324,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Estimated Fare</Text>
             <Text style={styles.metaValue}>{
-               `₹${job.paymentAmount}`
+               job.paymentAmount != null && job.paymentAmount > 0 ? `₹${job.paymentAmount}` : '—'
             }</Text>
           </View>
           <View style={styles.metaRow}>
@@ -317,7 +336,11 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <Text style={styles.metaValue}>{job.paymentStatus ?? '—'}</Text>
           </View>
           {job.notes ? <Text style={styles.notes}>{job.notes}</Text> : null}
-          {isTrackingLocation && <Text style={styles.trackingBadge}>Sharing live location with dispatch…</Text>}
+          {isSharingLocation && ACTIVE_RIDE_STATUSES.includes(job.status) && (
+            <Text style={styles.trackingBadge}>
+              Sharing live location with dispatch{isHighFrequencyMode ? ' (high frequency)' : ''}…
+            </Text>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -499,9 +522,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  actionButtonDisabled: {
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    opacity: 0.5,
+  },
   actionLabel: {
     fontSize: typography.body,
     color: colors.primary,
+  },
+  actionLabelDisabled: {
+    color: colors.muted,
   },
   metaRow: {
     flexDirection: 'row',
