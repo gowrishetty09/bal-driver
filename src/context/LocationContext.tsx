@@ -2,7 +2,8 @@ import React, { createContext, useCallback, useEffect, useMemo, useRef, useState
 import { AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 
-import { sendLocation } from '../api/driver';
+import { socketService } from '../services/socketService';
+import { sendLocation as sendLocationRest } from '../api/driver';
 import { useAuth } from '../hooks/useAuth';
 
 export type LocationPermissionState = Location.PermissionStatus | 'undetermined';
@@ -15,15 +16,16 @@ export type LocationContextValue = {
   requestPermission: () => Promise<void>;
   setHighFrequencyMode: (enabled: boolean) => void;
   isHighFrequencyMode: boolean;
+  setActiveBookingId: (bookingId: string | null) => void;
 };
 
 export const LocationContext = createContext<LocationContextValue | null>(null);
 
-const LOCATION_INTERVAL_MS = 30000; // Normal: 30 seconds
-const HIGH_FREQUENCY_INTERVAL_MS = 10000; // Active ride: 10 seconds
+const LOCATION_INTERVAL_MS = 3000; // Normal: 3 seconds
+const HIGH_FREQUENCY_INTERVAL_MS = 1000; // Active ride: 1 second
 
 export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [permissionStatus, setPermissionStatus] = useState<LocationPermissionState>('undetermined');
   const [isSharingLocation, setIsSharingLocation] = useState(false);
   const [lastSentAt, setLastSentAt] = useState<string | null>(null);
@@ -32,9 +34,29 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     longitude: number;
   } | null>(null);
   const [isHighFrequencyMode, setHighFrequencyModeState] = useState(false);
+  const [activeBookingId, setActiveBookingIdState] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const highFrequencyRef = useRef(false);
+  const activeBookingIdRef = useRef<string | null>(null);
+
+  // Connect/disconnect socket based on authentication
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      socketService.connect(user.id);
+    } else {
+      socketService.disconnect();
+    }
+
+    return () => {
+      socketService.disconnect();
+    };
+  }, [isAuthenticated, user?.id]);
+
+  const setActiveBookingId = useCallback((bookingId: string | null) => {
+    activeBookingIdRef.current = bookingId;
+    setActiveBookingIdState(bookingId);
+  }, []);
 
   const stopInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -45,7 +67,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   }, []);
 
   const sendCurrentLocation = useCallback(async () => {
-    if (permissionStatus !== 'granted' || !isAuthenticated) {
+    if (permissionStatus !== 'granted' || !isAuthenticated || !user?.id) {
       return;
     }
 
@@ -57,16 +79,29 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       const coords = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
+        heading: position.coords.heading ?? undefined,
+        speed: position.coords.speed ?? undefined,
       };
 
-      setLastKnownCoordinates(coords);
-      await sendLocation(coords);
+      setLastKnownCoordinates({ latitude: coords.latitude, longitude: coords.longitude });
+
+      // Try WebSocket first, fall back to REST if not connected
+      const sent = socketService.sendLocation({
+        ...coords,
+        bookingId: activeBookingIdRef.current ?? undefined,
+      });
+
+      if (!sent) {
+        // Fallback to REST API if socket not connected
+        await sendLocationRest({ latitude: coords.latitude, longitude: coords.longitude });
+      }
+
       setLastSentAt(new Date().toISOString());
       setIsSharingLocation(true);
     } catch (error) {
       console.log('Unable to send location update', error);
     }
-  }, [isAuthenticated, permissionStatus]);
+  }, [isAuthenticated, permissionStatus, user?.id]);
 
   const startInterval = useCallback((highFrequency = false) => {
     // Clear existing interval first
@@ -172,8 +207,9 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       requestPermission,
       setHighFrequencyMode,
       isHighFrequencyMode,
+      setActiveBookingId,
     }),
-    [permissionStatus, isSharingLocation, lastSentAt, lastKnownCoordinates, requestPermission, setHighFrequencyMode, isHighFrequencyMode]
+    [permissionStatus, isSharingLocation, lastSentAt, lastKnownCoordinates, requestPermission, setHighFrequencyMode, isHighFrequencyMode, setActiveBookingId]
   );
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
