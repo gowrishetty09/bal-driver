@@ -18,6 +18,7 @@ interface RideMapViewProps {
     pickupAddress?: string;
     dropAddress?: string;
     onNavigatePress?: () => void;
+    fullScreen?: boolean;
 }
 
 // Light map style for better visibility
@@ -42,6 +43,7 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
     pickupAddress,
     dropAddress,
     onNavigatePress,
+    fullScreen = false,
 }) => {
     const mapRef = useRef<MapView>(null);
 
@@ -183,7 +185,7 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, fullScreen && styles.fullScreenContainer]}>
             <MapView
                 ref={mapRef}
                 style={styles.map}
@@ -254,8 +256,8 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                 )}
             </MapView>
 
-            {/* Navigate button */}
-            {destination && (
+            {/* Navigate button - only show in non-fullscreen mode */}
+            {destination && !fullScreen && (
                 <View style={styles.navigationOverlay}>
                     <Pressable style={styles.navigateButton} onPress={handleNavigate}>
                         <Text style={styles.navigateButtonText}>
@@ -265,14 +267,16 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                 </View>
             )}
 
-            {/* Status indicator */}
-            <View style={styles.statusOverlay}>
-                <Text style={styles.statusText}>
-                    {status === 'EN_ROUTE' && 'Heading to pickup'}
-                    {status === 'ARRIVED' && 'Waiting at pickup'}
-                    {status === 'PICKED_UP' && 'En route to drop-off'}
-                </Text>
-            </View>
+            {/* Status indicator - only show in non-fullscreen mode */}
+            {!fullScreen && (
+                <View style={styles.statusOverlay}>
+                    <Text style={styles.statusText}>
+                        {status === 'EN_ROUTE' && 'Heading to pickup'}
+                        {status === 'ARRIVED' && 'Waiting at pickup'}
+                        {status === 'PICKED_UP' && 'En route to drop-off'}
+                    </Text>
+                </View>
+            )}
         </View>
     );
 };
@@ -283,6 +287,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         overflow: 'hidden',
         marginBottom: 16,
+    },
+    fullScreenContainer: {
+        ...StyleSheet.absoluteFillObject,
+        height: '100%',
+        borderRadius: 0,
+        marginBottom: 0,
     },
     map: {
         ...StyleSheet.absoluteFillObject,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Linking,
   Modal,
   Pressable,
@@ -29,6 +30,8 @@ import {
 import { getErrorMessage } from '../../utils/errors';
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { emitJobRefresh } from '../../utils/events';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   ASSIGNED: 'Assigned',
@@ -222,6 +225,164 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const dropoffAddress = job.dropoff?.addressLine ?? 'Dropoff location pending';
   const dropoffNote = job.dropoff?.landmark ?? '';
 
+  // Active ride: Full-screen map with bottom overlay card
+  if (showMap) {
+    return (
+      <View style={styles.fullScreenContainer}>
+        {/* Full-screen map */}
+        <RideMapView
+          driverLocation={lastKnownCoordinates}
+          pickupCoords={job.pickupCoords}
+          dropCoords={job.dropCoords}
+          status={job.status}
+          pickupAddress={pickupAddress}
+          dropAddress={dropoffAddress}
+          fullScreen
+        />
+
+        {/* Bottom overlay card */}
+        <View style={styles.bottomOverlay}>
+          {/* Navigate button at top of overlay */}
+          <Pressable 
+            style={styles.navigateOverlayButton} 
+            onPress={() => {
+              const destination = job.status === 'PICKED_UP' && job.dropCoords 
+                ? { lat: job.dropCoords.lat, lng: job.dropCoords.lng, label: 'Drop-off' }
+                : job.pickupCoords 
+                  ? { lat: job.pickupCoords.lat, lng: job.pickupCoords.lng, label: 'Pickup' }
+                  : null;
+              if (destination) {
+                const url = `google.navigation:q=${destination.lat},${destination.lng}`;
+                Linking.openURL(url).catch(() => {
+                  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`);
+                });
+              }
+            }}
+          >
+            <Text style={styles.navigateOverlayButtonText}>
+              Navigate to {job.status === 'PICKED_UP' ? 'Drop-off' : 'Pickup'}
+            </Text>
+          </Pressable>
+
+          {/* Status badge */}
+          <View style={styles.overlayStatusBadge}>
+            <Text style={styles.overlayStatusText}>
+              {job.status === 'EN_ROUTE' && '🚗 Heading to pickup'}
+              {job.status === 'ARRIVED' && '📍 Waiting at pickup'}
+              {job.status === 'PICKED_UP' && '🛣️ En route to drop-off'}
+            </Text>
+          </View>
+
+          {/* Customer info row */}
+          <View style={styles.overlayCustomerRow}>
+            <View style={styles.overlayCustomerInfo}>
+              <Text style={styles.overlayCustomerName}>{job.passengerName || 'Customer'}</Text>
+            </View>
+            <Pressable
+              style={[
+                styles.overlayCallButton,
+                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.overlayCallButtonDisabled
+              ]}
+              onPress={handleCallPassenger}
+              disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+            >
+              <Text style={styles.overlayCallIcon}>📞</Text>
+            </Pressable>
+          </View>
+
+          {/* Fare & Payment info row */}
+          <View style={styles.overlayPaymentRow}>
+            <View style={styles.overlayPaymentItem}>
+              <Text style={styles.overlayPaymentLabel}>Fare</Text>
+              <Text style={styles.overlayPaymentValue}>
+                {job.paymentAmount != null && job.paymentAmount > 0 ? `₹${job.paymentAmount}` : '—'}
+              </Text>
+            </View>
+            <View style={styles.overlayPaymentItem}>
+              <Text style={styles.overlayPaymentLabel}>Method</Text>
+              <Text style={styles.overlayPaymentValue}>{job.paymentMethod ?? '—'}</Text>
+            </View>
+            <View style={styles.overlayPaymentItem}>
+              <Text style={styles.overlayPaymentLabel}>Status</Text>
+              <Text style={[
+                styles.overlayPaymentValue,
+                job.paymentStatus === 'PAID' && styles.overlayPaymentPaid
+              ]}>
+                {job.paymentStatus ?? '—'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action buttons */}
+          <View style={styles.overlayActionsContainer}>
+            {nextStatus && (
+              <Pressable
+                style={styles.overlayPrimaryAction}
+                onPress={() => handleStatusUpdate(nextStatus)}
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.overlayPrimaryActionLabel}>
+                    {nextStatus === 'ARRIVED' && 'Mark as Arrived'}
+                    {nextStatus === 'PICKED_UP' && 'Mark Pickup'}
+                    {nextStatus === 'COMPLETED' && 'Mark Completed'}
+                  </Text>
+                )}
+              </Pressable>
+            )}
+            <Pressable
+              style={styles.overlayCancelAction}
+              onPress={() => setCancelModalVisible(true)}
+            >
+              <Text style={styles.overlayCancelActionLabel}>Cancel Ride</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Cancel Modal */}
+        <Modal visible={cancelModalVisible} animationType="slide" transparent>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.sectionTitle}>Cancel Ride</Text>
+              <Text style={styles.subtle}>Provide a reason so dispatch can notify the rider.</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Reason for cancellation"
+                placeholderTextColor={colors.muted}
+                multiline
+                value={cancelReason}
+                onChangeText={setCancelReason}
+              />
+              <View style={styles.modalActions}>
+                <Pressable style={styles.modalSecondary} onPress={() => setCancelModalVisible(false)}>
+                  <Text style={styles.secondaryActionLabel}>Dismiss</Text>
+                </Pressable>
+                <Pressable style={styles.modalPrimary} onPress={confirmCancellation} disabled={actionLoading}>
+                  {actionLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryActionLabel}>Confirm cancel</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Feedback Prompt */}
+        <FeedbackPrompt
+          visible={showFeedbackPrompt}
+          onClose={() => setShowFeedbackPrompt(false)}
+          bookingId={job?.id}
+          title="How was this trip?"
+        />
+      </View>
+    );
+  }
+
+  // Non-active ride: Regular scrollable layout
   return (
     <Screen>
       <ScrollView
@@ -237,18 +398,6 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <Text style={styles.statusChipText}>{STATUS_LABELS[job.status]}</Text>
           </View>
         </View>
-
-        {/* Map with directions - shown only for active rides */}
-        {showMap && (
-          <RideMapView
-            driverLocation={lastKnownCoordinates}
-            pickupCoords={job.pickupCoords}
-            dropCoords={job.dropCoords}
-            status={job.status}
-            pickupAddress={pickupAddress}
-            dropAddress={dropoffAddress}
-          />
-        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pickup & Drop</Text>
@@ -429,6 +578,139 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 16,
+    paddingBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  navigateOverlayButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  navigateOverlayButtonText: {
+    color: '#fff',
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  overlayStatusBadge: {
+    backgroundColor: colors.background,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignSelf: 'center',
+  },
+  overlayStatusText: {
+    fontSize: typography.caption,
+    color: colors.text,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  overlayCustomerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  overlayCustomerInfo: {
+    flex: 1,
+  },
+  overlayCustomerName: {
+    fontSize: typography.subheading,
+    fontFamily: typography.fontFamilyMedium,
+    color: colors.text,
+  },
+  overlayCallButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  overlayCallButtonDisabled: {
+    backgroundColor: colors.border,
+    opacity: 0.5,
+  },
+  overlayCallIcon: {
+    fontSize: 20,
+  },
+  overlayPaymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  overlayPaymentItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  overlayPaymentLabel: {
+    fontSize: typography.caption,
+    color: colors.muted,
+    marginBottom: 4,
+  },
+  overlayPaymentValue: {
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+    color: colors.text,
+  },
+  overlayPaymentPaid: {
+    color: colors.primary,
+  },
+  overlayActionsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  overlayPrimaryAction: {
+    flex: 2,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayPrimaryActionLabel: {
+    color: '#fff',
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  overlayCancelAction: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayCancelActionLabel: {
+    color: colors.danger,
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+  },
   loaderContainer: {
     flex: 1,
     alignItems: 'center',
