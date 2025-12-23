@@ -1,5 +1,6 @@
 // Polyfill FormData for Hermes engine compatibility with axios
 // This must be loaded before any other imports
+
 if (typeof globalThis.FormData === 'undefined') {
     globalThis.FormData = class FormData {
         constructor() {

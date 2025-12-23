@@ -20,12 +20,18 @@ interface RideMapViewProps {
     onNavigatePress?: () => void;
 }
 
-const darkMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+// Light map style for better visibility
+const lightMapStyle = [
+    {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+    },
+    {
+        featureType: 'transit',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+    },
 ];
 
 export const RideMapView: React.FC<RideMapViewProps> = ({
@@ -183,7 +189,7 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
                 initialRegion={initialRegion}
-                customMapStyle={darkMapStyle}
+                customMapStyle={lightMapStyle}
                 showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={true}

@@ -1,156 +1,253 @@
-import { io, Socket } from 'socket.io-client';
+import { InteractionManager } from 'react-native';
 import { API_BASE_URL } from '../utils/config';
 
-// Extract base URL without /api path for WebSocket connection
+/**
+ * Socket Service - Dynamic Loading Implementation
+ *
+ * socket.io-client is loaded DYNAMICALLY after the app has fully initialized
+ * to avoid "Property 'WebSocket' doesn't exist" errors during React Native startup.
+ *
+ * The socket connection is used for:
+ * - Real-time driver location updates to backend
+ * - Real-time ride status updates
+ */
+
 const getSocketUrl = () => {
-    const url = API_BASE_URL.replace(/\/api\/?$/, '');
-    return url;
+	const url = API_BASE_URL.replace(/\/api\/?$/, '');
+	return url;
 };
 
-interface DriverJoinedData {
-    driverId: string;
-}
+type Socket = any;
 
-interface LocationAckData {
-    received: boolean;
-    timestamp: string;
-}
+// Dynamic socket.io loader - only loads after app is fully ready
+let ioModule: typeof import('socket.io-client') | null = null;
+let loadPromise: Promise<typeof import('socket.io-client') | null> | null = null;
+
+const loadSocketIO = (): Promise<typeof import('socket.io-client') | null> => {
+	if (ioModule) {
+		return Promise.resolve(ioModule);
+	}
+
+	if (loadPromise) {
+		return loadPromise;
+	}
+
+	loadPromise = new Promise((resolve) => {
+		// Wait for React Native to be fully initialized
+		InteractionManager.runAfterInteractions(() => {
+			// Additional small delay to ensure WebSocket is available on global
+			setTimeout(async () => {
+				try {
+					// Ensure WebSocket is on globalThis for socket.io-client
+					if (typeof global !== 'undefined' && (global as any).WebSocket) {
+						if (typeof globalThis !== 'undefined' && !globalThis.WebSocket) {
+							globalThis.WebSocket = (global as any).WebSocket;
+						}
+					}
+
+					// Dynamic import - this only runs after runtime is ready
+					const socketIO = await import('socket.io-client');
+					ioModule = socketIO;
+					console.log('[Socket] socket.io-client loaded successfully');
+					resolve(socketIO);
+				} catch (e) {
+					console.warn('[Socket] Failed to load socket.io-client:', e);
+					resolve(null);
+				}
+			}, 200);
+		});
+	});
+
+	return loadPromise;
+};
 
 class SocketService {
-    private socket: Socket | null = null;
-    private driverId: string | null = null;
-    private reconnectAttempts = 0;
-    private maxReconnectAttempts = 10;
+	private socket: Socket | null = null;
+	private driverId: string | null = null;
+	private reconnectAttempts = 0;
+	private maxReconnectAttempts = 10;
+	private connecting = false;
+	private initialized = false;
 
-    connect(driverId: string): Socket {
-        if (this.socket?.connected && this.driverId === driverId) {
-            return this.socket;
-        }
+	/**
+	 * Initialize socket.io (call this after app has mounted)
+	 */
+	async initialize(): Promise<void> {
+		if (this.initialized) return;
 
-        // Disconnect existing connection if any
-        this.disconnect();
+		const io = await loadSocketIO();
+		if (io) {
+			this.initialized = true;
+			console.log('[Socket] Service initialized');
+		}
+	}
 
-        this.driverId = driverId;
-        const socketUrl = getSocketUrl();
+	/**
+	 * Connect to socket server
+	 */
+	async connect(driverId: string): Promise<Socket | null> {
+		if (this.connecting) {
+			return this.socket;
+		}
 
-        console.log(`[Socket] Connecting to ${socketUrl} as driver ${driverId}`);
+		if (this.socket?.connected && this.driverId === driverId) {
+			return this.socket;
+		}
 
-        this.socket = io(socketUrl, {
-            transports: ['websocket', 'polling'],
-            autoConnect: true,
-            reconnection: true,
-            reconnectionAttempts: this.maxReconnectAttempts,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            timeout: 20000,
-        });
+		this.connecting = true;
 
-        this.socket.on('connect', () => {
-            console.log(`[Socket] Connected with id: ${this.socket?.id}`);
-            this.reconnectAttempts = 0;
-            // Join driver-specific room
-            this.socket?.emit('driver:join', { driverId: this.driverId });
-        });
+		try {
+			// Ensure socket.io is loaded
+			const io = await loadSocketIO();
+			if (!io) {
+				console.warn('[Socket] socket.io not available, using REST API fallback');
+				this.connecting = false;
+				return null;
+			}
 
-        this.socket.on('driver:joined', (data: DriverJoinedData) => {
-            console.log(`[Socket] Joined driver room:`, data);
-        });
+			// Disconnect existing connection if any
+			this.disconnect();
 
-        this.socket.on('disconnect', (reason: string) => {
-            console.log(`[Socket] Disconnected: ${reason}`);
-        });
+			this.driverId = driverId;
+			const socketUrl = getSocketUrl();
 
-        this.socket.on('connect_error', (error: Error) => {
-            console.log(`[Socket] Connection error:`, error.message);
-            this.reconnectAttempts++;
-        });
+			console.log(`[Socket] Connecting to ${socketUrl} as driver ${driverId}`);
 
-        this.socket.on('driver:locationAck', (data: LocationAckData) => {
-            console.log(`[Socket] Location acknowledged:`, data.timestamp);
-        });
+			this.socket = io.io(socketUrl, {
+				transports: ['polling', 'websocket'],
+				autoConnect: true,
+				reconnection: true,
+				reconnectionAttempts: this.maxReconnectAttempts,
+				reconnectionDelay: 1000,
+				reconnectionDelayMax: 5000,
+				timeout: 20000,
+			});
 
-        return this.socket;
-    }
+			this.socket.on('connect', () => {
+				console.log(`[Socket] Connected with id: ${this.socket?.id}`);
+				this.reconnectAttempts = 0;
+				this.socket?.emit('driver:join', { driverId: this.driverId });
+			});
 
-    disconnect(): void {
-        if (this.socket) {
-            console.log('[Socket] Disconnecting...');
-            this.socket.disconnect();
-            this.socket = null;
-            this.driverId = null;
-        }
-    }
+			this.socket.on('driver:joined', (data: any) => {
+				console.log(`[Socket] Joined driver room:`, data);
+			});
 
-    isConnected(): boolean {
-        return this.socket?.connected ?? false;
-    }
+			this.socket.on('disconnect', (reason: string) => {
+				console.log(`[Socket] Disconnected: ${reason}`);
+			});
 
-    getSocket(): Socket | null {
-        return this.socket;
-    }
+			this.socket.on('connect_error', (error: Error) => {
+				this.reconnectAttempts++;
+				if (this.reconnectAttempts <= 3) {
+					console.log(
+						`[Socket] Connection error (${this.reconnectAttempts}/${this.maxReconnectAttempts}):`,
+						error.message
+					);
+				} else if (this.reconnectAttempts === this.maxReconnectAttempts) {
+					console.log(`[Socket] Max reconnection attempts reached`);
+				}
+			});
 
-    /**
-     * Send driver location update via WebSocket
-     */
-    sendLocation(data: {
-        latitude: number;
-        longitude: number;
-        heading?: number;
-        speed?: number;
-        bookingId?: string;
-    }): boolean {
-        if (!this.socket?.connected || !this.driverId) {
-            console.log('[Socket] Cannot send location - not connected');
-            return false;
-        }
+			this.socket.on('driver:locationAck', (data: any) => {
+				console.log(`[Socket] Location acknowledged:`, data.timestamp);
+			});
 
-        this.socket.emit('driver:updateLocation', {
-            driverId: this.driverId,
-            ...data,
-        });
+			return this.socket;
+		} catch (error) {
+			console.log('[Socket] Failed to connect:', error);
+			return null;
+		} finally {
+			this.connecting = false;
+		}
+	}
 
-        return true;
-    }
+	/**
+	 * Disconnect from socket server
+	 */
+	disconnect(): void {
+		this.connecting = false;
+		if (this.socket) {
+			console.log('[Socket] Disconnecting...');
+			this.socket.disconnect();
+			this.socket = null;
+			this.driverId = null;
+		}
+	}
 
-    /**
-     * Join a booking room to receive updates for a specific booking
-     */
-    joinBookingRoom(bookingId: string): void {
-        if (!this.socket?.connected) {
-            console.log('[Socket] Cannot join booking room - not connected');
-            return;
-        }
-        this.socket.emit('join:booking', { bookingId });
-    }
+	/**
+	 * Check if connected
+	 */
+	isConnected(): boolean {
+		return this.socket?.connected ?? false;
+	}
 
-    /**
-     * Leave a booking room
-     */
-    leaveBookingRoom(bookingId: string): void {
-        if (!this.socket?.connected) {
-            console.log('[Socket] Cannot leave booking room - not connected');
-            return;
-        }
-        this.socket.emit('leave:booking', { bookingId });
-    }
+	/**
+	 * Get the socket instance
+	 */
+	getSocket(): Socket | null {
+		return this.socket;
+	}
 
-    /**
-     * Subscribe to an event
-     */
-    on(event: string, callback: (...args: any[]) => void): void {
-        this.socket?.on(event, callback);
-    }
+	/**
+	 * Send driver location update via WebSocket
+	 */
+	sendLocation(data: {
+		latitude: number;
+		longitude: number;
+		heading?: number;
+		speed?: number;
+		bookingId?: string;
+	}): boolean {
+		if (!this.socket?.connected || !this.driverId) {
+			return false;
+		}
 
-    /**
-     * Unsubscribe from an event
-     */
-    off(event: string, callback?: (...args: any[]) => void): void {
-        if (callback) {
-            this.socket?.off(event, callback);
-        } else {
-            this.socket?.off(event);
-        }
-    }
+		this.socket.emit('driver:updateLocation', {
+			driverId: this.driverId,
+			...data,
+		});
+
+		return true;
+	}
+
+	/**
+	 * Join a booking room to receive updates for a specific booking
+	 */
+	joinBookingRoom(bookingId: string): void {
+		if (!this.socket?.connected) {
+			return;
+		}
+		this.socket.emit('join:booking', { bookingId });
+	}
+
+	/**
+	 * Leave a booking room
+	 */
+	leaveBookingRoom(bookingId: string): void {
+		if (!this.socket?.connected) {
+			return;
+		}
+		this.socket.emit('leave:booking', { bookingId });
+	}
+
+	/**
+	 * Subscribe to an event
+	 */
+	on(event: string, callback: (...args: any[]) => void): void {
+		this.socket?.on(event, callback);
+	}
+
+	/**
+	 * Unsubscribe from an event
+	 */
+	off(event: string, callback?: (...args: any[]) => void): void {
+		if (callback) {
+			this.socket?.off(event, callback);
+		} else {
+			this.socket?.off(event);
+		}
+	}
 }
 
 // Export singleton instance

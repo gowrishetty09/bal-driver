@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocationService } from '../../hooks/useLocationService';
+import { changeDriverPassword } from '../../api/passwordReset';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { getErrorMessage } from '../../utils/errors';
@@ -47,6 +48,11 @@ export const DriverProfileScreen: React.FC = () => {
   const { permissionStatus, requestPermission, isSharingLocation, lastSentAt, lastKnownCoordinates } =
     useLocationService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const effectiveCoords = useMemo(() => {
     if (lastKnownCoordinates) {
@@ -73,8 +79,42 @@ export const DriverProfileScreen: React.FC = () => {
     }
   };
 
-  const handleEditProfile = () => {
-    showSuccessToast('Profile', 'Your profile is up to date.');
+  const resetPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword.trim()) {
+      showErrorToast('Error', 'Please enter your current password.');
+      return;
+    }
+    if (!newPassword.trim()) {
+      showErrorToast('Error', 'Please enter a new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      showErrorToast('Error', 'New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showErrorToast('Error', 'New passwords do not match.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changeDriverPassword({ currentPassword, newPassword });
+      showSuccessToast('Success', 'Your password has been changed.');
+      setShowPasswordModal(false);
+      resetPasswordForm();
+    } catch (error) {
+      const message = getErrorMessage(error, 'Unable to change password');
+      showErrorToast('Error', message);
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -114,8 +154,11 @@ export const DriverProfileScreen: React.FC = () => {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Profile Actions</Text>
-        <Pressable style={styles.secondaryButton} onPress={handleEditProfile}>
-          <Text style={styles.secondaryButtonLabel}>Update profile</Text>
+        <Pressable 
+          style={styles.secondaryButton} 
+          onPress={() => setShowPasswordModal(true)}
+        >
+          <Text style={styles.secondaryButtonLabel}>Change Password</Text>
         </Pressable>
         <Pressable style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
           {isLoggingOut ? <ActivityIndicator color="#fff" /> : <Text style={styles.logoutLabel}>Logout</Text>}
@@ -145,6 +188,78 @@ export const DriverProfileScreen: React.FC = () => {
           <Ionicons name="chevron-forward" size={20} color="#fff" style={styles.chevron} />
         </Pressable>
       </View>
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={showPasswordModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setShowPasswordModal(false);
+          resetPasswordForm();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Current Password"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              autoCapitalize="none"
+            />
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="New Password"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+              autoCapitalize="none"
+            />
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Confirm New Password"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              autoCapitalize="none"
+            />
+            
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  resetPasswordForm();
+                }}
+                disabled={isChangingPassword}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              
+              <Pressable
+                style={[styles.modalSubmitButton, isChangingPassword && styles.disabledButton]}
+                onPress={handleChangePassword}
+                disabled={isChangingPassword}
+              >
+                {isChangingPassword ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Change Password</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 };
@@ -214,6 +329,9 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   logoutButton: {
     marginTop: 16,
     paddingVertical: 14,
@@ -247,5 +365,66 @@ const styles = StyleSheet.create({
   },
   chevron: {
     marginLeft: 'auto',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: typography.heading,
+    fontFamily: typography.fontFamilyBold,
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: typography.body,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: colors.muted,
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  modalSubmitButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  modalSubmitText: {
+    color: '#fff',
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
   },
 });

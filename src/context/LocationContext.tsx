@@ -39,11 +39,15 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const highFrequencyRef = useRef(false);
   const activeBookingIdRef = useRef<string | null>(null);
+  const hasRequestedPermission = useRef(false);
 
   // Connect/disconnect socket based on authentication
   useEffect(() => {
     if (isAuthenticated && user?.id) {
-      socketService.connect(user.id);
+      // Initialize socket asynchronously after app is ready
+      socketService.connect(user.id).catch((err: any) => {
+        console.log('[Location] Socket connection error:', err);
+      });
     } else {
       socketService.disconnect();
     }
@@ -166,10 +170,10 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
 
     if (permissionStatus === 'granted') {
       startInterval();
-    } else if (permissionStatus === 'undetermined') {
+    } else if (!hasRequestedPermission.current) {
+      // Request permission only once per app session when user is authenticated
+      hasRequestedPermission.current = true;
       requestPermission();
-    } else {
-      stopInterval();
     }
   }, [isAuthenticated, permissionStatus, requestPermission, startInterval, stopInterval]);
 

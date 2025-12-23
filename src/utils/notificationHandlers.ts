@@ -39,23 +39,45 @@ export const triggerVibration = (notificationType: NotificationType): void => {
 
 /**
  * Extract notification type from notification data
+ * Backend sends 'type' field with values like 'DRIVER_ASSIGNED', 'RIDE_STARTED', etc.
+ * Mobile uses 'notificationType' with values like 'NEW_RIDE', 'RIDE_CANCELLED', etc.
  */
 export const getNotificationType = (data?: Record<string, string | number | boolean>): NotificationType => {
     if (!data) {
         return 'NEW_RIDE';
     }
 
-    const type = data.notificationType;
-    if (type === 'NEW_RIDE' || type === 'RIDE_CANCELLED' || type === 'SOS_MESSAGE' || type === 'ADMIN_REASSIGNMENT') {
-        return type;
+    // Check for mobile-style notificationType first
+    const mobileType = data.notificationType;
+    if (mobileType === 'NEW_RIDE' || mobileType === 'RIDE_CANCELLED' || mobileType === 'SOS_MESSAGE' || mobileType === 'ADMIN_REASSIGNMENT') {
+        return mobileType;
     }
 
-    return 'NEW_RIDE';
+    // Map backend notification types to mobile types
+    const backendType = data.type as string;
+    switch (backendType) {
+        case 'DRIVER_ASSIGNED':
+        case 'NEW_BOOKING':
+        case 'BOOKING_CREATED':
+            return 'NEW_RIDE';
+        case 'BOOKING_CANCELLED':
+        case 'RIDE_CANCELLED':
+            return 'RIDE_CANCELLED';
+        case 'SOS_ALERT':
+        case 'SOS_MESSAGE':
+            return 'SOS_MESSAGE';
+        case 'DRIVER_REASSIGNED':
+        case 'ADMIN_UPDATE':
+            return 'ADMIN_REASSIGNMENT';
+        default:
+            return 'NEW_RIDE';
+    }
 };
 
 /**
  * Handle notification tap/press action
  * Returns navigation params for routing
+ * Backend sends entityId for booking ID, mobile sends jobId
  */
 export const handleNotificationPress = (data?: Record<string, string | number | boolean>) => {
     if (!data) {
@@ -63,6 +85,8 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
     }
 
     const notificationType = getNotificationType(data);
+    // Backend sends entityId, mobile sends jobId - support both
+    const jobId = data.jobId || data.entityId;
 
     switch (notificationType) {
         case 'NEW_RIDE':
@@ -72,7 +96,7 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
             return {
                 screen: 'ActiveJobsTab',
                 params: {
-                    jobId: data.jobId,
+                    jobId: jobId,
                     openDetails: true,
                 },
             };

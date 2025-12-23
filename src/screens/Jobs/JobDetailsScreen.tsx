@@ -95,23 +95,19 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     }
 
     const needsHighFrequency = ACTIVE_RIDE_STATUSES.includes(job.status);
+    const isTerminal = TERMINAL_STATUSES.includes(job.status);
     
-    if (needsHighFrequency && !isHighFrequencyMode) {
+    if (needsHighFrequency) {
       setHighFrequencyMode(true);
-    }
-
-    // Disable high frequency when ride is completed or cancelled
-    if (TERMINAL_STATUSES.includes(job.status) && isHighFrequencyMode) {
+    } else if (isTerminal) {
       setHighFrequencyMode(false);
     }
     
     // Cleanup: disable high frequency when leaving this screen
     return () => {
-      if (isHighFrequencyMode) {
-        setHighFrequencyMode(false);
-      }
+      setHighFrequencyMode(false);
     };
-  }, [job, isHighFrequencyMode, setHighFrequencyMode]);
+  }, [job?.status, setHighFrequencyMode]);
 
   const handleStatusUpdate = useCallback(
     async (nextStatus: JobStatus, reason?: string) => {
@@ -140,16 +136,6 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         if (nextStatus === 'COMPLETED') {
           setTimeout(() => setShowFeedbackPrompt(true), 1000);
         }
-
-        // Enable high frequency location updates when starting the ride
-        if (ACTIVE_RIDE_STATUSES.includes(nextStatus)) {
-          setHighFrequencyMode(true);
-        }
-
-        // Disable high frequency when ride is completed/cancelled
-        if (TERMINAL_STATUSES.includes(nextStatus)) {
-          setHighFrequencyMode(false);
-        }
       } catch (error) {
         const message = getErrorMessage(error, 'Failed to update status');
         showErrorToast('Update failed', message);
@@ -159,7 +145,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setCancelReason('');
       }
     },
-    [job, setHighFrequencyMode]
+    [job]
   );
 
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;

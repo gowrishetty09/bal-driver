@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "npx expo start -c --go",
+    "start": "npx expo start -c",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web"
@@ -40,7 +40,6 @@
     "@types/react": "~19.1.10",
     "@types/react-dom": "~19.1.7",
     "@types/react-native": "^0.72.8",
-    "@types/socket.io-client": "^1.4.36",
     "typescript": "^5.9.3"
   }
 }

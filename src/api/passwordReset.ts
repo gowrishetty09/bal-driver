@@ -67,3 +67,24 @@ export const confirmDriverPasswordReset = async (
     );
     return data;
 };
+
+// Change password while authenticated
+export type ChangePasswordPayload = {
+    currentPassword: string;
+    newPassword: string;
+};
+
+export type ChangePasswordResponse = {
+    success: boolean;
+    message?: string;
+};
+
+export const changeDriverPassword = async (
+    payload: ChangePasswordPayload
+): Promise<ChangePasswordResponse> => {
+    const { data } = await apiClient.post<ChangePasswordResponse>(
+        '/auth/driver/change-password',
+        payload
+    );
+    return data;
+};
