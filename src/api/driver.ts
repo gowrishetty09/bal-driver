@@ -48,6 +48,7 @@ export type DriverJob = {
     reference: string;
     status: JobStatus;
     type: JobType;
+    rideType?: string;
     pickup?: LocationPoint | null;
     dropoff?: LocationPoint | null;
     pickupCoords?: Coordinates | null;
@@ -60,6 +61,8 @@ export type DriverJob = {
     passengerEmail?: string;
     scheduledTime: string;
     notes?: string;
+    flightNo?: string | null;
+    flightEta?: string | null;
 };
 
 export type DriverJobDetail = DriverJob & {
@@ -192,6 +195,28 @@ export const updateDriverJobStatus = async (
     }
 };
 
+/**
+ * Notify backend when driver arrives at pickup location
+ * This triggers notifications to admin and customer
+ */
+export const notifyDriverArrival = async (
+    jobId: string,
+    notificationType: 'arrived' | 'at_pickup' | 'en_route' | 'picked_up',
+    coordinates?: { latitude: number; longitude: number }
+): Promise<void> => {
+    try {
+        await apiClient.post(`/driver/jobs/${jobId}/notify`, {
+            notificationType,
+            coordinates,
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        if (!shouldUseMocks()) {
+            console.warn('Failed to send arrival notification:', error);
+        }
+    }
+};
+
 export const sendLocation = async (coords: LocationPayload): Promise<void> => {
     try {
         await apiClient.post('/driver/location', coords);
@@ -212,6 +237,8 @@ type BackendJob = {
     dropLocation?: string | null;
     pickupCoords?: { lat: number; lng: number } | null;
     dropCoords?: { lat: number; lng: number } | null;
+    flightNo?: string | null;
+    flightEta?: string | null;
     paymentStatus?: string;
     paymentMethod?: string;
     paymentAmount?: number;
@@ -227,6 +254,7 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     reference: j.vehicle?.registrationNo ?? j.id,
     status: j.status,
     type: listType,
+    rideType: j.rideType ?? undefined,
     pickup: j.pickupLocation && j.pickupLocation.trim() !== ''
         ? { addressLine: j.pickupLocation }
         : undefined,
@@ -242,6 +270,8 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     paymentStatus: j.paymentStatus ?? undefined,
     scheduledTime: j.pickupTime ?? new Date().toISOString(),
     notes: undefined,
+    flightNo: j.flightNo ?? null,
+    flightEta: j.flightEta ?? null,
 });
 
 const mapBackendJobToDriverJobDetail = (j: BackendJob): DriverJobDetail => ({

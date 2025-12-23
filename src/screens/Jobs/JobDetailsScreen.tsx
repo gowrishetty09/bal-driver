@@ -22,16 +22,44 @@ import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { ActiveJobsStackParamList, HistoryJobsStackParamList, UpcomingJobsStackParamList } from '../../types/navigation';
 import {
+  DriverJob,
   DriverJobDetail,
   JobStatus,
   getDriverJobDetails,
+  getDriverJobs,
   updateDriverJobStatus,
+  notifyDriverArrival,
 } from '../../api/driver';
 import { getErrorMessage } from '../../utils/errors';
-import { showErrorToast, showSuccessToast } from '../../utils/toast';
+import { showErrorToast, showSuccessToast, showInfoToast } from '../../utils/toast';
 import { emitJobRefresh } from '../../utils/events';
+import { socketService } from '../../services/socketService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Pickup proximity threshold in meters (100m radius)
+const PICKUP_PROXIMITY_THRESHOLD_METERS = 100;
+
+// Simple distance calculation using Haversine formula (no external dependency)
+const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+};
 
 const STATUS_LABELS: Record<JobStatus, string> = {
   ASSIGNED: 'Assigned',
@@ -64,12 +92,69 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [hasInProgressRide, setHasInProgressRide] = useState(false);
+  const [inProgressRideId, setInProgressRideId] = useState<string | null>(null);
   
   // Use global location service
   const { isSharingLocation, setHighFrequencyMode, isHighFrequencyMode, lastKnownCoordinates } = useLocationService();
 
   // Determine if map should be shown (active ride statuses only)
   const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
+
+  // Check if driver is near pickup location
+  const isNearPickup = useMemo(() => {
+    try {
+      if (!lastKnownCoordinates || !job?.pickupCoords) return false;
+      const distance = calculateDistance(
+        lastKnownCoordinates.latitude,
+        lastKnownCoordinates.longitude,
+        job.pickupCoords.lat,
+        job.pickupCoords.lng
+      );
+      return distance <= PICKUP_PROXIMITY_THRESHOLD_METERS;
+    } catch (error) {
+      console.warn('Error calculating distance:', error);
+      return false;
+    }
+  }, [lastKnownCoordinates, job?.pickupCoords]);
+
+  // Check for in-progress rides (EN_ROUTE, ARRIVED, PICKED_UP)
+  const checkForInProgressRides = useCallback(async () => {
+    try {
+      const activeJobs = await getDriverJobs('ACTIVE');
+      const inProgressJob = activeJobs.find(
+        (j: DriverJob) => ACTIVE_RIDE_STATUSES.includes(j.status) && j.id !== jobId
+      );
+      setHasInProgressRide(!!inProgressJob);
+      setInProgressRideId(inProgressJob?.id ?? null);
+    } catch (error) {
+      console.warn('Failed to check for in-progress rides:', error);
+    }
+  }, [jobId]);
+
+  // Notify admin and customer when driver arrives or is at pickup
+  const notifyArrival = useCallback(async (bookingId: string, type: 'arrived' | 'at_pickup') => {
+    // Send via WebSocket for real-time notification
+    socketService.safeSend({
+      event: 'driver:statusNotification',
+      data: {
+        bookingId,
+        notificationType: type,
+        timestamp: new Date().toISOString(),
+      },
+    });
+    
+    // Also send via REST API for persistence and push notifications
+    await notifyDriverArrival(
+      bookingId,
+      type,
+      lastKnownCoordinates ? {
+        latitude: lastKnownCoordinates.latitude,
+        longitude: lastKnownCoordinates.longitude,
+      } : undefined
+    );
+  }, [lastKnownCoordinates]);
 
   const fetchDetails = useCallback(async () => {
     if (!jobId) {
@@ -89,7 +174,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
   useEffect(() => {
     fetchDetails();
-  }, [fetchDetails]);
+    checkForInProgressRides();
+  }, [fetchDetails, checkForInProgressRides]);
 
   // Enable high-frequency location updates when on an active ride
   useEffect(() => {
@@ -118,6 +204,26 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         return;
       }
 
+      // Prevent En Route if another ride is in progress
+      if (nextStatus === 'EN_ROUTE' && hasInProgressRide) {
+        Alert.alert(
+          'Ride In Progress',
+          'You have another ride in progress. Please complete or cancel that ride first.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Validate proximity for marking as ARRIVED
+      if (nextStatus === 'ARRIVED' && !isNearPickup) {
+        Alert.alert(
+          'Not at Pickup Location',
+          `You need to be within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m of the pickup location to mark as arrived.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       setActionLoading(true);
       try {
         const updatedJob = await updateDriverJobStatus(job.id, nextStatus, reason);
@@ -135,10 +241,19 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         emitJobRefresh();
         showSuccessToast('Status updated', `Ride marked as ${STATUS_LABELS[nextStatus]}`);
 
+        // Notify admin and customer when driver marks as arrived
+        if (nextStatus === 'ARRIVED') {
+          notifyArrival(job.id, 'arrived');
+          showInfoToast('Notification sent', 'Admin and customer have been notified of your arrival');
+        }
+
         // Show feedback prompt after completing a trip
         if (nextStatus === 'COMPLETED') {
           setTimeout(() => setShowFeedbackPrompt(true), 1000);
         }
+
+        // Refresh in-progress rides check
+        checkForInProgressRides();
       } catch (error) {
         const message = getErrorMessage(error, 'Failed to update status');
         showErrorToast('Update failed', message);
@@ -148,7 +263,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setCancelReason('');
       }
     },
-    [job]
+    [job, hasInProgressRide, isNearPickup, notifyArrival, checkForInProgressRides]
   );
 
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
@@ -197,6 +312,19 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
   const timelineItems = useMemo(() => job?.timeline ?? [], [job]);
 
+  // Calculate estimated time display (must be before any early returns - hooks rule)
+  const estimatedTime = useMemo((): string | undefined => {
+    if (job?.durationMinutes) {
+      const hours = Math.floor(job.durationMinutes / 60);
+      const mins = job.durationMinutes % 60;
+      if (hours > 0) {
+        return `${hours}h ${mins}m`;
+      }
+      return `${mins} min`;
+    }
+    return undefined;
+  }, [job?.durationMinutes]);
+
   if (loading) {
     return (
       <Screen contentContainerStyle={styles.loaderContainer}>
@@ -221,28 +349,100 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     );
   }
 
+  const isAirportTransfer = job.rideType === 'AIRPORT_TRANSFER' || job.rideType === 'AIRPORT_RETURN_TRANSFER';
+
   const pickupAddress = job.pickup?.addressLine ?? 'Pickup location pending';
   const dropoffAddress = job.dropoff?.addressLine ?? 'Dropoff location pending';
   const dropoffNote = job.dropoff?.landmark ?? '';
 
-  // Active ride: Full-screen map with bottom overlay card
+  // Active ride: Map at top with details panel below (non-overlapping)
   if (showMap) {
-    return (
-      <View style={styles.fullScreenContainer}>
-        {/* Full-screen map */}
-        <RideMapView
-          driverLocation={lastKnownCoordinates}
-          pickupCoords={job.pickupCoords}
-          dropCoords={job.dropCoords}
-          status={job.status}
-          pickupAddress={pickupAddress}
-          dropAddress={dropoffAddress}
-          fullScreen
-        />
+    // Fullscreen map modal
+    if (isMapFullscreen) {
+      return (
+        <View style={styles.fullScreenContainer}>
+          {/* Full-screen map */}
+          <RideMapView
+            driverLocation={lastKnownCoordinates}
+            pickupCoords={job.pickupCoords}
+            dropCoords={job.dropCoords}
+            status={job.status}
+            pickupAddress={pickupAddress}
+            dropAddress={dropoffAddress}
+            fullScreen
+            showDirections
+            estimatedTime={estimatedTime}
+            estimatedDistance={job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined}
+          />
 
-        {/* Bottom overlay card */}
-        <View style={styles.bottomOverlay}>
-          {/* Navigate button at top of overlay */}
+          {/* Close fullscreen button */}
+          <Pressable
+            style={styles.closeFullscreenButton}
+            onPress={() => setIsMapFullscreen(false)}
+          >
+            <Text style={styles.closeFullscreenButtonText}>✕</Text>
+          </Pressable>
+
+          {/* Navigate button overlay */}
+          <View style={styles.fullscreenNavigateContainer}>
+            <Pressable 
+              style={styles.navigateOverlayButton} 
+              onPress={() => {
+                const destination = job.status === 'PICKED_UP' && job.dropCoords 
+                  ? { lat: job.dropCoords.lat, lng: job.dropCoords.lng, label: 'Drop-off' }
+                  : job.pickupCoords 
+                    ? { lat: job.pickupCoords.lat, lng: job.pickupCoords.lng, label: 'Pickup' }
+                    : null;
+                if (destination) {
+                  const url = `google.navigation:q=${destination.lat},${destination.lng}`;
+                  Linking.openURL(url).catch(() => {
+                    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`);
+                  });
+                }
+              }}
+            >
+              <Text style={styles.navigateOverlayButtonText}>
+                🧭 Navigate to {job.status === 'PICKED_UP' ? 'Drop-off' : 'Pickup'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    // Normal view: Map at top, details panel below (no overlap)
+    return (
+      <View style={styles.activeRideContainer}>
+        {/* Map section - top aligned */}
+        <View style={styles.mapSection}>
+          <RideMapView
+            driverLocation={lastKnownCoordinates}
+            pickupCoords={job.pickupCoords}
+            dropCoords={job.dropCoords}
+            status={job.status}
+            pickupAddress={pickupAddress}
+            dropAddress={dropoffAddress}
+            showDirections
+            estimatedTime={estimatedTime}
+            estimatedDistance={job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined}
+          />
+
+          {/* Maximize map button */}
+          <Pressable
+            style={styles.maximizeMapButton}
+            onPress={() => setIsMapFullscreen(true)}
+          >
+            <Text style={styles.maximizeMapButtonText}>⛶</Text>
+          </Pressable>
+        </View>
+
+        {/* Details panel - scrollable below map */}
+        <ScrollView 
+          style={styles.detailsPanel}
+          contentContainerStyle={styles.detailsPanelContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Navigate button */}
           <Pressable 
             style={styles.navigateOverlayButton} 
             onPress={() => {
@@ -260,35 +460,99 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             }}
           >
             <Text style={styles.navigateOverlayButtonText}>
-              Navigate to {job.status === 'PICKED_UP' ? 'Drop-off' : 'Pickup'}
+              🧭 Navigate to {job.status === 'PICKED_UP' ? 'Drop-off' : 'Pickup'}
             </Text>
           </Pressable>
 
-          {/* Status badge */}
-          <View style={styles.overlayStatusBadge}>
-            <Text style={styles.overlayStatusText}>
-              {job.status === 'EN_ROUTE' && '🚗 Heading to pickup'}
-              {job.status === 'ARRIVED' && '📍 Waiting at pickup'}
-              {job.status === 'PICKED_UP' && '🛣️ En route to drop-off'}
-            </Text>
+          {/* Status and ETA badge */}
+          <View style={styles.statusEtaRow}>
+            <View style={styles.overlayStatusBadge}>
+              <Text style={styles.overlayStatusText}>
+                {job.status === 'EN_ROUTE' && '🚗 Heading to pickup'}
+                {job.status === 'ARRIVED' && '📍 Waiting at pickup'}
+                {job.status === 'PICKED_UP' && '🛣️ En route to drop-off'}
+              </Text>
+            </View>
+            {(estimatedTime || job.distanceKm) && (
+              <View style={styles.etaBadge}>
+                {estimatedTime && <Text style={styles.etaText}>⏱ {estimatedTime}</Text>}
+                {job.distanceKm && <Text style={styles.etaText}>📍 {job.distanceKm.toFixed(1)} km</Text>}
+              </View>
+            )}
           </View>
 
           {/* Customer info row */}
           <View style={styles.overlayCustomerRow}>
             <View style={styles.overlayCustomerInfo}>
               <Text style={styles.overlayCustomerName}>{job.passengerName || 'Customer'}</Text>
+              {job.passengerPhone && job.passengerPhone.trim() !== '' && (
+                <Text style={styles.overlayCustomerPhone}>{job.passengerPhone}</Text>
+              )}
             </View>
-            <Pressable
-              style={[
-                styles.overlayCallButton,
-                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.overlayCallButtonDisabled
-              ]}
-              onPress={handleCallPassenger}
-              disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
-            >
-              <Text style={styles.overlayCallIcon}>📞</Text>
-            </Pressable>
+            <View style={styles.customerActions}>
+              <Pressable
+                style={[
+                  styles.overlayCallButton,
+                  (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.overlayCallButtonDisabled
+                ]}
+                onPress={handleCallPassenger}
+                disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+              >
+                <Text style={styles.overlayCallIcon}>📞</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.overlayCallButton,
+                  styles.whatsappButton,
+                  (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.overlayCallButtonDisabled
+                ]}
+                onPress={handleWhatsApp}
+                disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+              >
+                <Text style={styles.overlayCallIcon}>💬</Text>
+              </Pressable>
+            </View>
           </View>
+
+          {/* Location details */}
+          <View style={styles.locationDetailsCard}>
+            <View style={styles.locationDetailRow}>
+              <View style={[styles.locationDot, styles.pickupDot]} />
+              <View style={styles.locationDetailText}>
+                <Text style={styles.locationDetailLabel}>Pickup</Text>
+                <Text style={styles.locationDetailValue}>{pickupAddress}</Text>
+              </View>
+            </View>
+            <View style={styles.locationConnector} />
+            <View style={styles.locationDetailRow}>
+              <View style={[styles.locationDot, styles.dropDotStyle]} />
+              <View style={styles.locationDetailText}>
+                <Text style={styles.locationDetailLabel}>Drop-off</Text>
+                <Text style={styles.locationDetailValue}>{dropoffAddress}</Text>
+                {dropoffNote ? <Text style={styles.locationDetailNote}>{dropoffNote}</Text> : null}
+              </View>
+            </View>
+          </View>
+
+          {isAirportTransfer && job.flightNo ? (
+            <View style={styles.locationDetailsCard}>
+              <View style={styles.locationDetailRow}>
+                <View style={[styles.locationDot, styles.pickupDot]} />
+                <View style={styles.locationDetailText}>
+                  <Text style={styles.locationDetailLabel}>Flight No</Text>
+                  <Text style={styles.locationDetailValue}>{job.flightNo}</Text>
+                </View>
+              </View>
+              <View style={styles.locationConnector} />
+              <View style={styles.locationDetailRow}>
+                <View style={[styles.locationDot, styles.dropDotStyle]} />
+                <View style={styles.locationDetailText}>
+                  <Text style={styles.locationDetailLabel}>Flight ETA</Text>
+                  <Text style={styles.locationDetailValue}>{job.flightEta ? formatDateTime(job.flightEta) : '—'}</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
 
           {/* Fare & Payment info row */}
           <View style={styles.overlayPaymentRow}>
@@ -313,13 +577,28 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             </View>
           </View>
 
+          {/* Proximity indicator for ARRIVED status validation */}
+          {job.status === 'EN_ROUTE' && (
+            <View style={[styles.proximityIndicator, isNearPickup ? styles.proximityNear : styles.proximityFar]}>
+              <Text style={styles.proximityText}>
+                {isNearPickup 
+                  ? '✓ You are at the pickup location' 
+                  : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`
+                }
+              </Text>
+            </View>
+          )}
+
           {/* Action buttons */}
           <View style={styles.overlayActionsContainer}>
             {nextStatus && (
               <Pressable
-                style={styles.overlayPrimaryAction}
+                style={[
+                  styles.overlayPrimaryAction,
+                  (nextStatus === 'ARRIVED' && !isNearPickup) && styles.actionButtonDisabledStyle
+                ]}
                 onPress={() => handleStatusUpdate(nextStatus)}
-                disabled={actionLoading}
+                disabled={actionLoading || (nextStatus === 'ARRIVED' && !isNearPickup)}
               >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
@@ -336,10 +615,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               style={styles.overlayCancelAction}
               onPress={() => setCancelModalVisible(true)}
             >
-              <Text style={styles.overlayCancelActionLabel}>Cancel Ride</Text>
+              <Text style={styles.overlayCancelActionLabel}>Cancel</Text>
             </Pressable>
           </View>
-        </View>
+        </ScrollView>
 
         {/* Cancel Modal */}
         <Modal visible={cancelModalVisible} animationType="slide" transparent>
@@ -484,6 +763,18 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                job.paymentAmount != null && job.paymentAmount > 0 ? `₹${job.paymentAmount}` : '—'
             }</Text>
           </View>
+          {isAirportTransfer && job.flightNo ? (
+            <>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Flight No</Text>
+                <Text style={styles.metaValue}>{job.flightNo}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Flight ETA</Text>
+                <Text style={styles.metaValue}>{job.flightEta ? formatDateTime(job.flightEta) : '—'}</Text>
+              </View>
+            </>
+          ) : null}
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Payment Method</Text>
             <Text style={styles.metaValue}>{job.paymentMethod ?? '—'}</Text>
@@ -520,8 +811,24 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
         {!isJobTerminal && (
           <View style={styles.section}>
+            {/* Warning for in-progress ride */}
+            {hasInProgressRide && nextStatus === 'EN_ROUTE' && (
+              <View style={styles.inProgressWarning}>
+                <Text style={styles.inProgressWarningText}>
+                  ⚠️ You have another ride in progress. Complete or cancel that ride first.
+                </Text>
+              </View>
+            )}
+            
             {nextStatus && (
-              <Pressable style={styles.primaryAction} onPress={() => handleStatusUpdate(nextStatus)} disabled={actionLoading}>
+              <Pressable 
+                style={[
+                  styles.primaryAction,
+                  (hasInProgressRide && nextStatus === 'EN_ROUTE') && styles.primaryActionDisabled
+                ]} 
+                onPress={() => handleStatusUpdate(nextStatus)} 
+                disabled={actionLoading || (hasInProgressRide && nextStatus === 'EN_ROUTE')}
+              >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -581,6 +888,161 @@ const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  activeRideContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  mapSection: {
+    height: SCREEN_HEIGHT * 0.35,
+    position: 'relative',
+  },
+  detailsPanel: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -16,
+  },
+  detailsPanelContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  maximizeMapButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  maximizeMapButtonText: {
+    fontSize: 20,
+    color: colors.text,
+  },
+  closeFullscreenButton: {
+    position: 'absolute',
+    top: 40,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeFullscreenButtonText: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  fullscreenNavigateContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 16,
+    right: 16,
+  },
+  statusEtaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  etaBadge: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  etaText: {
+    fontSize: typography.caption,
+    color: colors.primary,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  overlayCustomerPhone: {
+    fontSize: typography.caption,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  customerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  whatsappButton: {
+    backgroundColor: '#25D366',
+  },
+  locationDetailsCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  locationDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  locationDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  pickupDot: {
+    backgroundColor: colors.primary,
+  },
+  dropDotStyle: {
+    backgroundColor: colors.accent,
+  },
+  locationDetailText: {
+    flex: 1,
+  },
+  locationDetailLabel: {
+    fontSize: typography.caption,
+    color: colors.muted,
+  },
+  locationDetailValue: {
+    fontSize: typography.body,
+    color: colors.text,
+    marginTop: 2,
+  },
+  locationDetailNote: {
+    fontSize: typography.caption,
+    color: colors.muted,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  locationConnector: {
+    width: 2,
+    height: 20,
+    backgroundColor: colors.border,
+    marginLeft: 5,
+    marginVertical: 4,
+  },
+  proximityIndicator: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  proximityNear: {
+    backgroundColor: '#E8F5E9',
+  },
+  proximityFar: {
+    backgroundColor: '#FFF3E0',
+  },
+  proximityText: {
+    fontSize: typography.caption,
+    textAlign: 'center',
+  },
+  actionButtonDisabledStyle: {
+    backgroundColor: colors.border,
+    opacity: 0.6,
   },
   bottomOverlay: {
     position: 'absolute',
@@ -899,10 +1361,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  primaryActionDisabled: {
+    backgroundColor: colors.border,
+    opacity: 0.6,
+  },
   primaryActionLabel: {
     color: '#fff',
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
+  },
+  inProgressWarning: {
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+  },
+  inProgressWarningText: {
+    fontSize: typography.caption,
+    color: '#E65100',
+    textAlign: 'center',
   },
   secondaryAction: {
     alignItems: 'center',

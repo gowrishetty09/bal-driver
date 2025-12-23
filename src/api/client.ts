@@ -82,10 +82,10 @@ apiClient.interceptors.response.use(
             }
 
             sessionTokens = tokens;
-            originalRequest.headers = {
-                ...originalRequest.headers,
-                Authorization: `Bearer ${tokens.accessToken}`,
-            };
+            if (!originalRequest.headers) {
+                originalRequest.headers = {} as any;
+            }
+            (originalRequest.headers as any).Authorization = `Bearer ${tokens.accessToken}`;
 
             return apiClient(originalRequest);
         } catch (refreshError) {

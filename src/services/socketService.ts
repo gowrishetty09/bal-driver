@@ -43,7 +43,10 @@ class SocketService {
 		}
 	}
 
-	private safeSend(message: WSMessage): boolean {
+	/**
+	 * Send a message over WebSocket (public wrapper for internal safeSend)
+	 */
+	safeSend(message: WSMessage): boolean {
 		if (!this.ws || !this.connected) return false;
 		try {
 			this.ws.send(JSON.stringify(message));
@@ -370,7 +373,15 @@ type WSMessage =
 	| { event: 'driver:locationAck'; data: any }
 	| { event: 'joined:booking'; data: any }
 	| { event: 'ping'; data: {} }
-	| { event: 'pong'; data: {} };
+	| { event: 'pong'; data: {} }
+	| {
+		event: 'driver:statusNotification';
+		data: {
+			bookingId: string;
+			notificationType: 'arrived' | 'at_pickup' | 'en_route' | 'picked_up';
+			timestamp: string;
+		};
+	};
 
 // Export singleton instance
 export const socketService = new SocketService();

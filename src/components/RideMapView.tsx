@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Dimensions, Platform, Linking, Pressable } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { colors } from '../theme/colors';
@@ -19,6 +19,9 @@ interface RideMapViewProps {
     dropAddress?: string;
     onNavigatePress?: () => void;
     fullScreen?: boolean;
+    showDirections?: boolean;
+    estimatedTime?: string;
+    estimatedDistance?: string;
 }
 
 // Light map style for better visibility
@@ -44,8 +47,12 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
     dropAddress,
     onNavigatePress,
     fullScreen = false,
+    showDirections = false,
+    estimatedTime,
+    estimatedDistance,
 }) => {
     const mapRef = useRef<MapView>(null);
+    const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }>>([]);
 
     // Determine which location to navigate to based on status
     const destination = useMemo(() => {
@@ -60,8 +67,43 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
         return null;
     }, [status, pickupCoords, dropCoords]);
 
-    // Calculate route points for the polyline
+    // Fetch directions from Google Directions API
+    const fetchDirections = useCallback(async () => {
+        try {
+            if (!driverLocation || !destination?.coords) {
+                setRouteCoordinates([]);
+                return;
+            }
+
+            // Always fallback to straight line for now to prevent crashes
+            // Google Directions API requires server-side proxy
+            setRouteCoordinates([
+                driverLocation,
+                { latitude: destination.coords.lat, longitude: destination.coords.lng },
+            ]);
+        } catch (error) {
+            console.warn('[Map] Error in fetchDirections:', error);
+            setRouteCoordinates([]);
+        }
+    }, [driverLocation, destination]);
+
+    // Fetch directions when relevant data changes
+    useEffect(() => {
+        try {
+            if (showDirections) {
+                fetchDirections();
+            }
+        } catch (error) {
+            console.warn('[Map] Error fetching directions:', error);
+        }
+    }, [showDirections, fetchDirections]);
+
+    // Calculate route points for the polyline (fallback if directions not fetched)
     const routePoints = useMemo(() => {
+        if (routeCoordinates.length > 0) {
+            return routeCoordinates;
+        }
+
         const points: Array<{ latitude: number; longitude: number }> = [];
 
         if (driverLocation) {
@@ -75,18 +117,8 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
             });
         }
 
-        // If we're past pickup, add drop location
-        if (status === 'PICKED_UP' && dropCoords && driverLocation) {
-            // Route is: driver -> drop
-        } else if (pickupCoords && dropCoords) {
-            // Show full route: driver -> pickup -> drop
-            if (driverLocation && status !== 'ARRIVED') {
-                // Already added driver location above
-            }
-        }
-
         return points;
-    }, [driverLocation, destination, pickupCoords, dropCoords, status]);
+    }, [driverLocation, destination, routeCoordinates]);
 
     // Fit map to show all markers
     useEffect(() => {
@@ -206,9 +238,13 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                         coordinate={driverLocation}
                         title="Your Location"
                         anchor={{ x: 0.5, y: 0.5 }}
+                        flat={true}
                     >
-                        <View style={styles.driverMarker}>
-                            <Text style={styles.driverMarkerIcon}>🚗</Text>
+                        <View style={styles.driverMarkerContainer}>
+                            <View style={styles.driverMarker}>
+                                <Text style={styles.driverMarkerIcon}>🚗</Text>
+                            </View>
+                            <View style={styles.driverMarkerPulse} />
                         </View>
                     </Marker>
                 )}
@@ -223,8 +259,11 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                         title="Pickup"
                         description={pickupAddress}
                     >
-                        <View style={styles.pickupMarker}>
-                            <View style={styles.markerDot} />
+                        <View style={styles.pickupMarkerContainer}>
+                            <View style={styles.pickupMarker}>
+                                <Text style={styles.markerLabel}>P</Text>
+                            </View>
+                            <View style={styles.markerPin} />
                         </View>
                     </Marker>
                 )}
@@ -239,8 +278,11 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                         title="Drop-off"
                         description={dropAddress}
                     >
-                        <View style={styles.dropMarker}>
-                            <View style={[styles.markerDot, styles.dropDot]} />
+                        <View style={styles.dropMarkerContainer}>
+                            <View style={styles.dropMarkerStyle}>
+                                <Text style={styles.markerLabel}>D</Text>
+                            </View>
+                            <View style={[styles.markerPin, styles.dropPin]} />
                         </View>
                     </Marker>
                 )}
@@ -250,31 +292,48 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                     <Polyline
                         coordinates={routePoints}
                         strokeColor={colors.primary}
-                        strokeWidth={4}
-                        lineDashPattern={[1]}
+                        strokeWidth={5}
+                        lineCap="round"
+                        lineJoin="round"
                     />
                 )}
             </MapView>
+
+            {/* ETA and Distance badge - top left */}
+            {(estimatedTime || estimatedDistance) && (
+                <View style={styles.etaContainer}>
+                    {estimatedTime && (
+                        <View style={styles.etaBadge}>
+                            <Text style={styles.etaIcon}>⏱</Text>
+                            <Text style={styles.etaText}>{estimatedTime}</Text>
+                        </View>
+                    )}
+                    {estimatedDistance && (
+                        <View style={styles.etaBadge}>
+                            <Text style={styles.etaIcon}>📍</Text>
+                            <Text style={styles.etaText}>{estimatedDistance}</Text>
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {/* Status indicator - top center */}
+            <View style={styles.statusOverlay}>
+                <Text style={styles.statusText}>
+                    {status === 'EN_ROUTE' && '🚗 Heading to pickup'}
+                    {status === 'ARRIVED' && '📍 Waiting at pickup'}
+                    {status === 'PICKED_UP' && '🛣️ En route to drop-off'}
+                </Text>
+            </View>
 
             {/* Navigate button - only show in non-fullscreen mode */}
             {destination && !fullScreen && (
                 <View style={styles.navigationOverlay}>
                     <Pressable style={styles.navigateButton} onPress={handleNavigate}>
                         <Text style={styles.navigateButtonText}>
-                            Navigate to {destination.label}
+                            🧭 Navigate to {destination.label}
                         </Text>
                     </Pressable>
-                </View>
-            )}
-
-            {/* Status indicator - only show in non-fullscreen mode */}
-            {!fullScreen && (
-                <View style={styles.statusOverlay}>
-                    <Text style={styles.statusText}>
-                        {status === 'EN_ROUTE' && 'Heading to pickup'}
-                        {status === 'ARRIVED' && 'Waiting at pickup'}
-                        {status === 'PICKED_UP' && 'En route to drop-off'}
-                    </Text>
                 </View>
             )}
         </View>
@@ -309,21 +368,82 @@ const styles = StyleSheet.create({
         color: colors.muted,
         fontSize: typography.body,
     },
+    driverMarkerContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     driverMarker: {
         backgroundColor: colors.primary,
-        padding: 8,
-        borderRadius: 20,
-        borderWidth: 2,
+        padding: 10,
+        borderRadius: 25,
+        borderWidth: 3,
         borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
     driverMarkerIcon: {
-        fontSize: 20,
+        fontSize: 24,
+    },
+    driverMarkerPulse: {
+        position: 'absolute',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: colors.primary,
+        opacity: 0.2,
+    },
+    pickupMarkerContainer: {
+        alignItems: 'center',
     },
     pickupMarker: {
-        padding: 8,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
-    dropMarker: {
-        padding: 8,
+    dropMarkerContainer: {
+        alignItems: 'center',
+    },
+    dropMarkerStyle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.accent,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    markerLabel: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    markerPin: {
+        width: 3,
+        height: 10,
+        backgroundColor: colors.primary,
+        marginTop: -2,
+    },
+    dropPin: {
+        backgroundColor: colors.accent,
     },
     markerDot: {
         width: 16,
@@ -335,6 +455,35 @@ const styles = StyleSheet.create({
     },
     dropDot: {
         backgroundColor: colors.accent,
+    },
+    etaContainer: {
+        position: 'absolute',
+        top: 50,
+        left: 12,
+        flexDirection: 'column',
+        gap: 8,
+    },
+    etaBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    etaIcon: {
+        fontSize: 14,
+        marginRight: 4,
+    },
+    etaText: {
+        fontSize: typography.caption,
+        color: colors.text,
+        fontFamily: typography.fontFamilyMedium,
     },
     navigationOverlay: {
         position: 'absolute',
@@ -348,6 +497,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         borderRadius: 12,
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
     navigateButtonText: {
         color: '#fff',
@@ -357,15 +511,15 @@ const styles = StyleSheet.create({
     statusOverlay: {
         position: 'absolute',
         top: 12,
-        left: 12,
-        right: 12,
+        left: 60,
+        right: 60,
     },
     statusText: {
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.75)',
         color: '#fff',
         paddingVertical: 8,
         paddingHorizontal: 12,
-        borderRadius: 8,
+        borderRadius: 20,
         fontSize: typography.caption,
         textAlign: 'center',
         overflow: 'hidden',

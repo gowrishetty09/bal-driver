@@ -47,7 +47,7 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
   }, [loadJobs]);
 
   const renderItem = ({ item }: { item: DriverJob }) => {
-    const fareValue = typeof item.fareAmount === 'number' ? item.fareAmount : 0;
+    const fareValue = typeof item.paymentAmount === 'number' ? item.paymentAmount : 0;
     return (
       <Pressable style={styles.card} onPress={() => navigation.navigate('JobDetails', { jobId: item.id })}>
         <View>
