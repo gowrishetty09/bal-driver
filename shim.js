@@ -1,6 +1,12 @@
-// Polyfill FormData for Hermes engine compatibility with axios
+// Polyfill queueMicrotask for Hermes engine compatibility
 // This must be loaded before any other imports
+if (typeof globalThis.queueMicrotask === 'undefined') {
+    globalThis.queueMicrotask = function (callback) {
+        Promise.resolve().then(callback).catch((e) => setTimeout(() => { throw e; }, 0));
+    };
+}
 
+// Polyfill FormData for Hermes engine compatibility with axios
 if (typeof globalThis.FormData === 'undefined') {
     globalThis.FormData = class FormData {
         constructor() {

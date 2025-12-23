@@ -189,13 +189,14 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
                 initialRegion={initialRegion}
-                customMapStyle={lightMapStyle}
                 showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={true}
                 rotateEnabled={true}
                 zoomEnabled={true}
                 pitchEnabled={true}
+                onMapReady={() => console.log('[Map] Map is ready')}
+                onMapLoaded={() => console.log('[Map] Map tiles loaded')}
             >
                 {/* Driver location marker - styled as a car */}
                 {driverLocation && (

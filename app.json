@@ -1,11 +1,13 @@
 {
   "expo": {
-    "name": "mobile-driver",
+    "name": "BAL Driver",
     "slug": "bal-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/AppIcons/playstore.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "jsEngine": "hermes",
     "notification": {
       "icon": "./assets/notifiy-icon.png",
       "color": "#151e2d"
@@ -41,6 +43,12 @@
         {
           "icon": "./assets/notifiy-icon.png",
           "color": "#151e2d"
+        }
+      ],
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyDRN3_J4mGdkmWifoACmHBfT68sIvD3kQ8"
         }
       ]
     ],
