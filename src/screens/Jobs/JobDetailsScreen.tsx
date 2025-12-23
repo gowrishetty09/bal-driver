@@ -54,7 +54,7 @@ type CombinedStackParamList = ActiveJobsStackParamList & UpcomingJobsStackParamL
 type Props = NativeStackScreenProps<CombinedStackParamList, 'JobDetails'>;
 
 export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
-  const { jobId } = route.params;
+  const { jobId } = route.params ?? {};
   const [job, setJob] = useState<DriverJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -69,6 +69,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
 
   const fetchDetails = useCallback(async () => {
+    if (!jobId) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await getDriverJobDetails(jobId);
       setJob(data);
@@ -118,7 +122,17 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       setActionLoading(true);
       try {
         const updatedJob = await updateDriverJobStatus(job.id, nextStatus, reason);
-        setJob(updatedJob);
+        // Merge updated job with existing job data to preserve fields like coordinates
+        // that may not be returned by the status update endpoint
+        setJob((prevJob) => ({
+          ...prevJob!,
+          ...updatedJob,
+          // Preserve coordinate data if not returned by the update endpoint
+          pickupCoords: updatedJob.pickupCoords ?? prevJob?.pickupCoords,
+          dropCoords: updatedJob.dropCoords ?? prevJob?.dropCoords,
+          pickup: updatedJob.pickup ?? prevJob?.pickup,
+          dropoff: updatedJob.dropoff ?? prevJob?.dropoff,
+        }));
         emitJobRefresh();
         showSuccessToast('Status updated', `Ride marked as ${STATUS_LABELS[nextStatus]}`);
 
@@ -198,6 +212,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     return (
       <Screen contentContainerStyle={styles.loaderContainer}>
         <ActivityIndicator color={colors.primary} size="large" />
+      </Screen>
+    );
+  }
+
+  if (!jobId) {
+    return (
+      <Screen contentContainerStyle={styles.loaderContainer}>
+        <Text style={styles.errorText}>Invalid job reference. Please go back and try again.</Text>
       </Screen>
     );
   }

@@ -7,9 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocationService } from '../../hooks/useLocationService';
-import { PlacesAutocompleteInput } from '../../components/PlacesAutocompleteInput';
-import { fetchPlaceDetails, PlaceDetails } from '../../services/googlePlaces';
-import { updateDriverLocation } from '../../api/driverLocation';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { getErrorMessage } from '../../utils/errors';
@@ -50,17 +47,6 @@ export const DriverProfileScreen: React.FC = () => {
   const { permissionStatus, requestPermission, isSharingLocation, lastSentAt, lastKnownCoordinates } =
     useLocationService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isResolvingPlace, setIsResolvingPlace] = useState(false);
-  const [isSavingLocation, setIsSavingLocation] = useState(false);
-  const initialLocation: PlaceDetails | null = user?.homeBaseLocation
-    ? {
-        description: user.homeBaseLocation.address,
-        latitude: user.homeBaseLocation.latitude,
-        longitude: user.homeBaseLocation.longitude,
-        placeId: user.homeBaseLocation.placeId ?? user.homeBaseLocation.address,
-      }
-    : null;
-  const [selectedLocation, setSelectedLocation] = useState<PlaceDetails | null>(initialLocation);
 
   const effectiveCoords = useMemo(() => {
     if (lastKnownCoordinates) {
@@ -90,47 +76,6 @@ export const DriverProfileScreen: React.FC = () => {
   const handleEditProfile = () => {
     showSuccessToast('Profile', 'Your profile is up to date.');
   };
-
-  const handlePlaceSelect = async (prediction: { placeId: string; description: string }) => {
-    setIsResolvingPlace(true);
-    try {
-      const details = await fetchPlaceDetails(prediction.placeId);
-      setSelectedLocation(details);
-    } catch (error) {
-      const message = getErrorMessage(error, 'Unable to resolve address');
-      showErrorToast('Location search', message);
-    } finally {
-      setIsResolvingPlace(false);
-    }
-  };
-
-  const handleSaveLocation = async () => {
-    if (!selectedLocation) {
-      return;
-    }
-    setIsSavingLocation(true);
-    try {
-      const payload = {
-        address: selectedLocation.description,
-        latitude: selectedLocation.latitude,
-        longitude: selectedLocation.longitude,
-        placeId: selectedLocation.placeId,
-      };
-      const response = await updateDriverLocation(payload);
-      await updateUserProfile((prev) => (prev ? { ...prev, homeBaseLocation: { ...payload, updatedAt: response.updatedAt } } : prev));
-      showSuccessToast('Location saved', 'Dispatch will see your updated base location.');
-    } catch (error) {
-      const message = getErrorMessage(error, 'Unable to save location');
-      showErrorToast('Location update', message);
-    } finally {
-      setIsSavingLocation(false);
-    }
-  };
-
-  const savedLocationLabel = selectedLocation?.description ?? 'Not set yet';
-  const locationUpdatedAt = user?.homeBaseLocation?.updatedAt
-    ? friendlyTime(user.homeBaseLocation.updatedAt)
-    : 'Never';
 
   return (
     <Screen scrollable contentContainerStyle={styles.content}>
@@ -165,32 +110,6 @@ export const DriverProfileScreen: React.FC = () => {
             <Text style={styles.secondaryButtonLabel}>Enable location sharing</Text>
           </Pressable>
         )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Base Location</Text>
-        <Text style={styles.sectionSubtitle}>Search and save your preferred pickup/home location.</Text>
-        <PlacesAutocompleteInput
-          placeholder="Search location"
-          initialValue={selectedLocation?.description}
-          onSelect={handlePlaceSelect}
-        />
-        {isResolvingPlace && <Text style={styles.metaText}>Resolving address…</Text>}
-        <View style={styles.savedLocationRow}>
-          <Text style={styles.metaText}>{savedLocationLabel}</Text>
-          <Text style={styles.metaText}>{`Last saved: ${locationUpdatedAt}`}</Text>
-        </View>
-        <Pressable
-          style={[styles.secondaryButton, styles.saveButton, (!selectedLocation || isSavingLocation || isResolvingPlace) && styles.disabledButton]}
-          onPress={handleSaveLocation}
-          disabled={!selectedLocation || isSavingLocation || isResolvingPlace}
-        >
-          {isSavingLocation ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : (
-            <Text style={styles.secondaryButtonLabel}>Save location</Text>
-          )}
-        </Pressable>
       </View>
 
       <View style={styles.card}>
@@ -290,16 +209,10 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: 'center',
   },
-  saveButton: {
-    marginTop: 12,
-  },
   secondaryButtonLabel: {
     color: colors.primary,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
-  },
-  disabledButton: {
-    opacity: 0.5,
   },
   logoutButton: {
     marginTop: 16,
@@ -312,10 +225,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
-  },
-  savedLocationRow: {
-    marginTop: 12,
-    gap: 4,
   },
   feedbackButton: {
     flexDirection: 'row',
