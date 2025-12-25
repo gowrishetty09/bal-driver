@@ -38,7 +38,7 @@ import { socketService } from '../../services/socketService';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Pickup proximity threshold in meters (100m radius)
-const PICKUP_PROXIMITY_THRESHOLD_METERS = 100;
+const PICKUP_PROXIMITY_THRESHOLD_METERS = 200;
 
 // Simple distance calculation using Haversine formula (no external dependency)
 const calculateDistance = (
@@ -97,27 +97,50 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [inProgressRideId, setInProgressRideId] = useState<string | null>(null);
   
   // Use global location service
-  const { isSharingLocation, setHighFrequencyMode, isHighFrequencyMode, lastKnownCoordinates } = useLocationService();
+  const { permissionStatus, requestPermission, isSharingLocation, setHighFrequencyMode, isHighFrequencyMode, lastKnownCoordinates } = useLocationService();
 
   // Determine if map should be shown (active ride statuses only)
   const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
 
-  // Check if driver is near pickup location
-  const isNearPickup = useMemo(() => {
+  const pickupProximity = useMemo(() => {
     try {
-      if (!lastKnownCoordinates || !job?.pickupCoords) return false;
-      const distance = calculateDistance(
-        lastKnownCoordinates.latitude,
-        lastKnownCoordinates.longitude,
-        job.pickupCoords.lat,
-        job.pickupCoords.lng
-      );
-      return distance <= PICKUP_PROXIMITY_THRESHOLD_METERS;
+      const hasDriverCoords = !!lastKnownCoordinates;
+      const hasPickupCoords = !!job?.pickupCoords;
+      if (!hasDriverCoords || !hasPickupCoords) {
+        return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+      }
+
+      const driverLat = Number(lastKnownCoordinates!.latitude);
+      const driverLng = Number(lastKnownCoordinates!.longitude);
+      const pickupLat = Number(job!.pickupCoords!.lat);
+      const pickupLng = Number(job!.pickupCoords!.lng);
+
+      if (
+        !Number.isFinite(driverLat) ||
+        !Number.isFinite(driverLng) ||
+        !Number.isFinite(pickupLat) ||
+        !Number.isFinite(pickupLng)
+      ) {
+        return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+      }
+
+      const distance = calculateDistance(driverLat, driverLng, pickupLat, pickupLng);
+      if (!Number.isFinite(distance)) {
+        return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+      }
+
+      return {
+        canVerify: true,
+        distanceMeters: distance,
+        isNear: distance <= PICKUP_PROXIMITY_THRESHOLD_METERS,
+      };
     } catch (error) {
-      console.warn('Error calculating distance:', error);
-      return false;
+      console.warn('Error calculating pickup proximity:', error);
+      return { canVerify: false, distanceMeters: null as number | null, isNear: false };
     }
   }, [lastKnownCoordinates, job?.pickupCoords]);
+
+  const isNearPickup = pickupProximity.canVerify ? pickupProximity.isNear : false;
 
   // Check for in-progress rides (EN_ROUTE, ARRIVED, PICKED_UP)
   const checkForInProgressRides = useCallback(async () => {
@@ -198,7 +221,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     };
   }, [job?.status, setHighFrequencyMode]);
 
-  const handleStatusUpdate = useCallback(
+  const performStatusUpdate = useCallback(
     async (nextStatus: JobStatus, reason?: string) => {
       if (!job) {
         return;
@@ -209,16 +232,6 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         Alert.alert(
           'Ride In Progress',
           'You have another ride in progress. Please complete or cancel that ride first.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // Validate proximity for marking as ARRIVED
-      if (nextStatus === 'ARRIVED' && !isNearPickup) {
-        Alert.alert(
-          'Not at Pickup Location',
-          `You need to be within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m of the pickup location to mark as arrived.`,
           [{ text: 'OK' }]
         );
         return;
@@ -263,7 +276,74 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setCancelReason('');
       }
     },
-    [job, hasInProgressRide, isNearPickup, notifyArrival, checkForInProgressRides]
+    [job, hasInProgressRide, notifyArrival, checkForInProgressRides]
+  );
+
+  const handleStatusUpdate = useCallback(
+    async (nextStatus: JobStatus, reason?: string) => {
+      if (!job) {
+        return;
+      }
+
+      // Prevent En Route if another ride is in progress
+      if (nextStatus === 'EN_ROUTE' && hasInProgressRide) {
+        Alert.alert(
+          'Ride In Progress',
+          'You have another ride in progress. Please complete or cancel that ride first.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Validate proximity for marking as ARRIVED
+      if (nextStatus === 'ARRIVED') {
+        if (pickupProximity.canVerify && !pickupProximity.isNear) {
+          const distanceText =
+            typeof pickupProximity.distanceMeters === 'number'
+              ? ` (currently ~${Math.round(pickupProximity.distanceMeters)}m away)`
+              : '';
+          Alert.alert(
+            'Not at Pickup Location',
+            `You need to be within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m of the pickup location to mark as arrived.${distanceText}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // If we cannot verify (missing pickup coords or location), allow with confirmation.
+        if (!pickupProximity.canVerify) {
+          if (permissionStatus !== 'granted') {
+            Alert.alert(
+              'Location Permission Needed',
+              'Enable location permission to verify you are at the pickup point.',
+              [
+                { text: 'Not now', style: 'cancel' },
+                {
+                  text: 'Enable',
+                  onPress: () => {
+                    requestPermission().catch(() => undefined);
+                  },
+                },
+              ]
+            );
+            return;
+          }
+
+          Alert.alert(
+            'Unable to Verify Proximity',
+            'Pickup coordinates or your current GPS location are unavailable. Do you want to mark as arrived anyway?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Mark arrived', onPress: () => void performStatusUpdate(nextStatus, reason) },
+            ]
+          );
+          return;
+        }
+      }
+
+      await performStatusUpdate(nextStatus, reason);
+    },
+    [job, hasInProgressRide, performStatusUpdate, pickupProximity, permissionStatus, requestPermission]
   );
 
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
@@ -582,8 +662,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <View style={[styles.proximityIndicator, isNearPickup ? styles.proximityNear : styles.proximityFar]}>
               <Text style={styles.proximityText}>
                 {isNearPickup 
-                  ? '✓ You are at the pickup location' 
-                  : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`
+                  ? `✓ You are at the pickup location${pickupProximity.canVerify && typeof pickupProximity.distanceMeters === 'number' ? ` (~${Math.round(pickupProximity.distanceMeters)}m)` : ''}`
+                  : pickupProximity.canVerify && typeof pickupProximity.distanceMeters === 'number'
+                    ? `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m) • ~${Math.round(pickupProximity.distanceMeters)}m away`
+                    : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`
                 }
               </Text>
             </View>
@@ -603,7 +685,12 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.overlayPrimaryActionLabel}>
+                  <Text
+                    style={[
+                      styles.overlayPrimaryActionLabel,
+                      (nextStatus === 'ARRIVED' && !isNearPickup) && styles.overlayPrimaryActionLabelDisabled,
+                    ]}
+                  >
                     {nextStatus === 'ARRIVED' && 'Mark as Arrived'}
                     {nextStatus === 'PICKED_UP' && 'Mark Pickup'}
                     {nextStatus === 'COMPLETED' && 'Mark Completed'}
@@ -1039,6 +1126,7 @@ const styles = StyleSheet.create({
   proximityText: {
     fontSize: typography.caption,
     textAlign: 'center',
+    color: colors.text,
   },
   actionButtonDisabledStyle: {
     backgroundColor: colors.border,
@@ -1158,6 +1246,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
+  },
+  overlayPrimaryActionLabelDisabled: {
+    color: colors.text,
   },
   overlayCancelAction: {
     flex: 1,
