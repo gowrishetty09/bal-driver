@@ -157,6 +157,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyBold,
     color: colors.text,
   },
+  subtle: {
+    fontSize: typography.caption,
+    color: colors.muted,
+  },
   passenger: {
     marginTop: 4,
     fontSize: typography.body,

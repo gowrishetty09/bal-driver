@@ -115,6 +115,10 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     color: colors.muted,
   },
+  subtle: {
+    fontSize: typography.caption,
+    color: colors.muted,
+  },
   rightContent: {
     alignItems: 'flex-end',
   },

@@ -110,6 +110,10 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     color: colors.muted,
   },
+  subtle: {
+    fontSize: typography.caption,
+    color: colors.muted,
+  },
   amount: {
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,

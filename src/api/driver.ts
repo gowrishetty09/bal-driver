@@ -17,20 +17,23 @@ export type DriverUser = {
     roles?: string[];
     vehicleNumber?: string;
     status?: 'ACTIVE' | 'INACTIVE' | string;
-    paymentAmount: number | null;
+    paymentAmount?: number | null;
     finalPrice?: number | null;
-    vehicleNumber?: string;
-    latitude: number;
-    longitude: number;
-    updatedAt: string;
-};
-homeBaseLocation ?: {
-    address: string;
-    latitude: number;
-    longitude: number;
-    placeId?: string;
+    latitude?: number;
+    longitude?: number;
+    lastLocation?: {
+        latitude: number;
+        longitude: number;
+        updatedAt: string;
+    };
+    homeBaseLocation?: {
+        address: string;
+        latitude: number;
+        longitude: number;
+        placeId?: string;
+        updatedAt?: string;
+    };
     updatedAt?: string;
-};
 };
 
 export type LocationPoint = {
@@ -51,6 +54,7 @@ export type DriverJob = {
     status: JobStatus;
     type: JobType;
     rideType?: string;
+    vehicleNumber?: string;
     pickup?: LocationPoint | null;
     dropoff?: LocationPoint | null;
     pickupCoords?: Coordinates | null;
