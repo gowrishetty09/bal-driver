@@ -53,6 +53,7 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
         <View>
           <Text style={styles.jobId}>{item.reference}</Text>
           <Text style={styles.passenger}>{item.passengerName}</Text>
+          <Text style={styles.subtle}>{item.vehicleNumber ?? '—'}</Text>
         </View>
         <Text style={styles.amount}>{`₹${fareValue.toFixed(0)}`}</Text>
       </Pressable>

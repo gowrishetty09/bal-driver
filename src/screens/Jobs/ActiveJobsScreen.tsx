@@ -54,7 +54,10 @@ export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
       onPress={() => navigation.navigate('JobDetails', { jobId: item.id })}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.jobId}>{item.reference}</Text>
+        <View>
+          <Text style={styles.jobId}>{item.reference}</Text>
+          <Text style={styles.subtle}>{item.vehicleNumber ?? '—'}</Text>
+        </View>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>{item.status}</Text>
         </View>

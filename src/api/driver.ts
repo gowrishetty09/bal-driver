@@ -17,18 +17,20 @@ export type DriverUser = {
     roles?: string[];
     vehicleNumber?: string;
     status?: 'ACTIVE' | 'INACTIVE' | string;
-    lastLocation?: {
-        latitude: number;
-        longitude: number;
-        updatedAt: string;
-    };
-    homeBaseLocation?: {
-        address: string;
-        latitude: number;
-        longitude: number;
-        placeId?: string;
-        updatedAt?: string;
-    };
+    paymentAmount: number | null;
+    finalPrice?: number | null;
+    vehicleNumber?: string;
+    latitude: number;
+    longitude: number;
+    updatedAt: string;
+};
+homeBaseLocation ?: {
+    address: string;
+    latitude: number;
+    longitude: number;
+    placeId?: string;
+    updatedAt?: string;
+};
 };
 
 export type LocationPoint = {
@@ -54,6 +56,7 @@ export type DriverJob = {
     pickupCoords?: Coordinates | null;
     dropCoords?: Coordinates | null;
     paymentAmount: number | null;
+    finalPrice?: number | null;
     paymentMethod?: string;
     paymentStatus?: string;
     passengerName: string;
@@ -242,16 +245,18 @@ type BackendJob = {
     paymentStatus?: string;
     paymentMethod?: string;
     paymentAmount?: number;
+    finalPrice?: number | null;
     guestName?: string | null;
     guestPhone?: string | null;
     hotelName?: string | null;
     hotelContact?: string | null;
     vehicle?: { id: string; registrationNo?: string | null } | null;
+    ref?: string | null;
 };
 
 const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob => ({
     id: j.id,
-    reference: j.vehicle?.registrationNo ?? j.id,
+    reference: j.ref ?? j.vehicle?.registrationNo ?? j.id,
     status: j.status,
     type: listType,
     rideType: j.rideType ?? undefined,
@@ -265,7 +270,10 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     dropCoords: j.dropCoords ?? undefined,
     passengerName: j.guestName && j.guestName.trim() !== '' ? j.guestName : 'Customer',
     passengerPhone: j.guestPhone && j.guestPhone.trim() !== '' ? j.guestPhone : '',
-    paymentAmount: j.paymentAmount ?? null,
+    // Prefer server-provided finalPrice if available, otherwise fall back to paymentAmount
+    paymentAmount: (j.finalPrice ?? j.paymentAmount) ?? null,
+    finalPrice: j.finalPrice ?? null,
+    vehicleNumber: j.vehicle?.registrationNo ?? undefined,
     paymentMethod: j.paymentMethod ?? undefined,
     paymentStatus: j.paymentStatus ?? undefined,
     scheduledTime: j.pickupTime ?? new Date().toISOString(),

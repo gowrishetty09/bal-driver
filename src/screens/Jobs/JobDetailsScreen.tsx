@@ -758,7 +758,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.jobId}>Vehicle: {job.vehiclePlate ?? job.reference}</Text>
+            <Text style={styles.jobId}>Ref: {job.reference}</Text>
+            <Text style={[styles.subtle, { marginTop: 6 }]}>Vehicle: {job.vehiclePlate ?? '—'}</Text>
           </View>
           <View style={styles.statusChip}>
             <Text style={styles.statusChipText}>{STATUS_LABELS[job.status]}</Text>

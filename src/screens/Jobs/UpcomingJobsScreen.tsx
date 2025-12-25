@@ -52,6 +52,7 @@ export const UpcomingJobsScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.jobId}>{item.reference}</Text>
         <Text style={styles.passenger}>{item.passengerName}</Text>
         <Text style={styles.route}>{item.pickup?.addressLine ?? '—'}</Text>
+        <Text style={styles.subtle}>{item.vehicleNumber ?? '—'}</Text>
       </View>
       <View style={styles.rightContent}>
         <Text style={styles.label}>Pickup</Text>
