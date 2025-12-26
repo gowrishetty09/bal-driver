@@ -270,8 +270,8 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     dropoff: j.dropLocation && j.dropLocation.trim() !== ''
         ? { addressLine: j.dropLocation }
         : undefined,
-    pickupCoords: j.pickupCoords ?? undefined,
-    dropCoords: j.dropCoords ?? undefined,
+    pickupCoords: resolveCoords(j.pickupCoords, (j as any).pickup) ?? resolveCoordsFromFields(j, 'pickup') ?? undefined,
+    dropCoords: resolveCoords(j.dropCoords, (j as any).dropoff) ?? resolveCoordsFromFields(j, 'drop') ?? undefined,
     passengerName: j.guestName && j.guestName.trim() !== '' ? j.guestName : 'Customer',
     passengerPhone: j.guestPhone && j.guestPhone.trim() !== '' ? j.guestPhone : '',
     // Prefer server-provided finalPrice if available, otherwise fall back to paymentAmount
@@ -295,6 +295,39 @@ const mapBackendJobToDriverJobDetail = (j: BackendJob): DriverJobDetail => ({
         { status: 'ASSIGNED', timestamp: j.pickupTime ?? new Date().toISOString() },
     ],
 });
+
+// Helpers to resolve coordinate shapes from different backend payload variations
+const resolveCoords = (coords: any, fallback?: any): { lat: number; lng: number } | undefined => {
+    if (!coords && !fallback) return undefined;
+    const c = coords ?? fallback;
+    if (!c) return undefined;
+    // Accept { lat, lng }
+    if (typeof c.lat === 'number' && typeof c.lng === 'number') return { lat: c.lat, lng: c.lng };
+    // Accept { latitude, longitude }
+    if (typeof c.latitude === 'number' && typeof c.longitude === 'number') return { lat: c.latitude, lng: c.longitude };
+    // Accept { lat: string, lng: string }
+    const maybeLat = Number(c.lat ?? c.latitude ?? c.latValue ?? c.latitudeValue);
+    const maybeLng = Number(c.lng ?? c.longitude ?? c.lngValue ?? c.longitudeValue);
+    if (!Number.isNaN(maybeLat) && !Number.isNaN(maybeLng)) return { lat: maybeLat, lng: maybeLng };
+    return undefined;
+};
+
+const resolveCoordsFromFields = (j: any, prefix: 'pickup' | 'drop') => {
+    // check fields like pickupLat/pickupLng, pickupLatitude/pickupLongitude
+    const latKeys = [`${prefix}Lat`, `${prefix}Latitude`, `${prefix}_lat`, `${prefix}_latitude`];
+    const lngKeys = [`${prefix}Lng`, `${prefix}Longitude`, `${prefix}_lng`, `${prefix}_longitude`];
+    for (const lk of latKeys) {
+        for (const rk of lngKeys) {
+            const lat = j[lk];
+            const lng = j[rk];
+            if (typeof lat === 'number' && typeof lng === 'number') return { lat, lng };
+            const nlat = Number(lat);
+            const nlng = Number(lng);
+            if (!Number.isNaN(nlat) && !Number.isNaN(nlng)) return { lat: nlat, lng: nlng };
+        }
+    }
+    return undefined;
+};
 
 // Mock helpers
 const mockUser: DriverUser = {

@@ -51,6 +51,17 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
     estimatedTime,
     estimatedDistance,
 }) => {
+    const readLatLng = (c?: any) => {
+        if (!c) return { lat: undefined as number | undefined, lng: undefined as number | undefined };
+        const tryNum = (v: any) => {
+            if (typeof v === 'number') return v;
+            const n = Number(v);
+            return Number.isFinite(n) ? n : undefined;
+        };
+        const lat = tryNum(c.lat ?? c.latitude ?? c.latValue ?? c.latitudeValue ?? c.latitudeValue);
+        const lng = tryNum(c.lng ?? c.longitude ?? c.lngValue ?? c.longitudeValue ?? c.longitudeValue);
+        return { lat, lng };
+    };
     const mapRef = useRef<MapView>(null);
     const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }>>([]);
 
@@ -77,9 +88,15 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
 
             // Always fallback to straight line for now to prevent crashes
             // Google Directions API requires server-side proxy
+            const { lat: dLat, lng: dLng } = readLatLng(destination.coords as any);
+            if (typeof dLat !== 'number' || typeof dLng !== 'number') {
+                console.warn('[Map] Destination coords invalid for directions:', destination.coords);
+                setRouteCoordinates([]);
+                return;
+            }
             setRouteCoordinates([
                 driverLocation,
-                { latitude: destination.coords.lat, longitude: destination.coords.lng },
+                { latitude: dLat, longitude: dLng },
             ]);
         } catch (error) {
             console.warn('[Map] Error in fetchDirections:', error);
@@ -98,6 +115,21 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
         }
     }, [showDirections, fetchDirections]);
 
+    // Debug: log coords when map has no valid markers (help diagnose missing data)
+    useEffect(() => {
+        const hasDriver = !!driverLocation;
+        const hasPickup = !!pickupCoords;
+        const hasDrop = !!dropCoords;
+        if (!hasDriver && !hasPickup && !hasDrop) {
+            console.warn('[RideMapView] No coordinates provided:', {
+                driverLocation,
+                pickupCoords,
+                dropCoords,
+                status,
+            });
+        }
+    }, [driverLocation, pickupCoords, dropCoords, status]);
+
     // Calculate route points for the polyline (fallback if directions not fetched)
     const routePoints = useMemo(() => {
         if (routeCoordinates.length > 0) {
@@ -111,10 +143,12 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
         }
 
         if (destination?.coords) {
-            points.push({
-                latitude: destination.coords.lat,
-                longitude: destination.coords.lng,
-            });
+            const { lat: dLat, lng: dLng } = readLatLng(destination.coords as any);
+            if (typeof dLat === 'number' && typeof dLng === 'number') {
+                points.push({ latitude: dLat, longitude: dLng });
+            } else {
+                console.warn('[Map] routePoints: destination coords invalid', destination.coords);
+            }
         }
 
         return points;
@@ -130,10 +164,20 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
             markers.push(driverLocation);
         }
         if (pickupCoords) {
-            markers.push({ latitude: pickupCoords.lat, longitude: pickupCoords.lng });
+            const { lat: pLat, lng: pLng } = readLatLng(pickupCoords as any);
+            if (typeof pLat === 'number' && typeof pLng === 'number') {
+                markers.push({ latitude: pLat, longitude: pLng });
+            } else {
+                console.warn('[Map] fitBounds: pickupCoords invalid', pickupCoords);
+            }
         }
         if (dropCoords) {
-            markers.push({ latitude: dropCoords.lat, longitude: dropCoords.lng });
+            const { lat: dLat, lng: dLng } = readLatLng(dropCoords as any);
+            if (typeof dLat === 'number' && typeof dLng === 'number') {
+                markers.push({ latitude: dLat, longitude: dLng });
+            } else {
+                console.warn('[Map] fitBounds: dropCoords invalid', dropCoords);
+            }
         }
 
         if (markers.length > 1) {
@@ -190,12 +234,16 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
             };
         }
         if (pickupCoords) {
-            return {
-                latitude: pickupCoords.lat,
-                longitude: pickupCoords.lng,
-                latitudeDelta: LATITUDE_DELTA,
-                longitudeDelta: LONGITUDE_DELTA,
-            };
+            const { lat: pLat, lng: pLng } = readLatLng(pickupCoords as any);
+            if (typeof pLat === 'number' && typeof pLng === 'number') {
+                return {
+                    latitude: pLat,
+                    longitude: pLng,
+                    latitudeDelta: LATITUDE_DELTA,
+                    longitudeDelta: LONGITUDE_DELTA,
+                };
+            }
+            console.warn('[Map] initialRegion: pickupCoords invalid', pickupCoords);
         }
         // Default to a generic location if nothing available
         return {
