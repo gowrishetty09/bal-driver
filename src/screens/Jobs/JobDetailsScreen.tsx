@@ -97,7 +97,15 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [inProgressRideId, setInProgressRideId] = useState<string | null>(null);
   
   // Use global location service
-  const { permissionStatus, requestPermission, isSharingLocation, setHighFrequencyMode, isHighFrequencyMode, lastKnownCoordinates } = useLocationService();
+  const {
+    permissionStatus,
+    requestPermission,
+    isSharingLocation,
+    setHighFrequencyMode,
+    isHighFrequencyMode,
+    lastKnownCoordinates,
+    setActiveBookingId,
+  } = useLocationService();
 
   // Determine if map should be shown (active ride statuses only)
   const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
@@ -220,6 +228,20 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       setHighFrequencyMode(false);
     };
   }, [job?.status, setHighFrequencyMode]);
+
+  // Attach the active booking/job id to location updates while on an active ride
+  useEffect(() => {
+    if (!job) {
+      return;
+    }
+
+    const isActiveRide = ACTIVE_RIDE_STATUSES.includes(job.status);
+    setActiveBookingId(isActiveRide ? job.id : null);
+
+    return () => {
+      setActiveBookingId(null);
+    };
+  }, [job?.id, job?.status, setActiveBookingId]);
 
   const performStatusUpdate = useCallback(
     async (nextStatus: JobStatus, reason?: string) => {
@@ -677,10 +699,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               <Pressable
                 style={[
                   styles.overlayPrimaryAction,
-                  (nextStatus === 'ARRIVED' && !isNearPickup) && styles.actionButtonDisabledStyle
+                  (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear) &&
+                    styles.actionButtonDisabledStyle
                 ]}
                 onPress={() => handleStatusUpdate(nextStatus)}
-                disabled={actionLoading || (nextStatus === 'ARRIVED' && !isNearPickup)}
+                disabled={
+                  actionLoading ||
+                  (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear)
+                }
               >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
@@ -688,7 +714,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   <Text
                     style={[
                       styles.overlayPrimaryActionLabel,
-                      (nextStatus === 'ARRIVED' && !isNearPickup) && styles.overlayPrimaryActionLabelDisabled,
+                      (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear) &&
+                        styles.overlayPrimaryActionLabelDisabled,
                     ]}
                   >
                     {nextStatus === 'ARRIVED' && 'Mark as Arrived'}

@@ -71,11 +71,10 @@ export const useNotificationService = () => {
         }
 
         try {
-            const platform = Platform.OS as 'android' | 'ios';
+            const platform = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
             const response = await registerDeviceToken({
                 token: pushToken,
                 platform,
-                role: 'DRIVER',
             });
 
             if (response.success) {

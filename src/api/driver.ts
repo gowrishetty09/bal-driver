@@ -364,8 +364,7 @@ const mockLogin = (_payload: LoginPayload): AuthenticatedDriverPayload => ({
  */
 export type RegisterDeviceTokenPayload = {
     token: string;
-    platform: 'android' | 'ios';
-    role: 'DRIVER';
+    platform: 'ANDROID' | 'IOS';
 };
 
 export type RegisterDeviceTokenResponse = {
