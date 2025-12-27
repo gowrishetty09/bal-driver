@@ -77,9 +77,24 @@ export const useNotificationService = () => {
                 platform,
             });
 
-            if (response.success) {
+            console.log('registerDeviceToken response:', response);
+
+            if (response && response.success) {
                 console.log('Push token registered successfully with backend');
                 await SecureStore.setItemAsync(PUSH_TOKEN_KEY, pushToken);
+            } else {
+                console.warn('Push token registration failed, retrying once');
+                // Retry once after brief delay
+                try {
+                    await new Promise((res) => setTimeout(res, 2000));
+                    const retryResp = await registerDeviceToken({ token: pushToken, platform });
+                    console.log('registerDeviceToken retry response:', retryResp);
+                    if (retryResp && retryResp.success) {
+                        await SecureStore.setItemAsync(PUSH_TOKEN_KEY, pushToken);
+                    }
+                } catch (retryErr) {
+                    console.error('Retry to register push token failed:', retryErr);
+                }
             }
         } catch (error) {
             console.error('Failed to register push token:', error);
@@ -220,8 +235,31 @@ export const useNotificationService = () => {
 
         const initializeNotifications = async (): Promise<void> => {
             try {
+                // Log auth & device state for diagnostics
+                try {
+                    console.log(`Initializing notifications: userId=${user?.id ?? 'unknown'} isAuthenticated=${!!isAuthenticated} hasAuthToken=${!!authToken} isDevice=${Device.isDevice}`);
+                } catch (err) {
+                    /* ignore logging errors */
+                }
+
                 // Setup Android notification channels
                 await setupNotificationChannel();
+
+                // Get native device push token (FCM/APNS) for diagnostics
+                try {
+                    const nativeTokenData = await Notifications.getDevicePushTokenAsync();
+                    console.log('Native device push token (diagnostics):', { data: nativeTokenData.data, type: (nativeTokenData as any).type });
+                } catch (err) {
+                    console.warn('Failed to get native device push token (diagnostics):', err);
+                }
+
+                // Log Expo/EAS projectId for diagnostics
+                try {
+                    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+                    console.log('Expo projectId (diagnostics):', projectId);
+                } catch (err) {
+                    /* ignore */
+                }
 
                 // Get Expo push token
                 const token = await getExpoPushToken();
