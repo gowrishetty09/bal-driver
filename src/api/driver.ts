@@ -13,6 +13,7 @@ export type DriverUser = {
     email: string;
     phone?: string;
     avatarUrl?: string;
+    licenseNumber?: string;
     role?: string;
     roles?: string[];
     vehicleNumber?: string;
@@ -410,14 +411,31 @@ export type RegisterDeviceTokenResponse = {
  * This allows the server to send push notifications to this device
  */
 export const registerDeviceToken = async (payload: RegisterDeviceTokenPayload): Promise<RegisterDeviceTokenResponse> => {
+    const payloadBody = payload;
     try {
-        const { data } = await apiClient.post<RegisterDeviceTokenResponse>('/notifications/register-device', payload);
-        return data;
+        const baseURL = API_BASE_URL;
+        console.log('Registering device token to:', `${baseURL}/notifications/register-device`);
+        const response = await apiClient.post<RegisterDeviceTokenResponse>('/notifications/register-device', payloadBody);
+        console.log('Device token register response:', response.data);
+        return response.data;
     } catch (error) {
         if (shouldUseMocks()) {
             return { success: true, message: 'Device token registered (mock)' };
         }
-        console.warn('Failed to register device token', error);
+        if (axios.isAxiosError(error)) {
+            const baseURL = error.config?.baseURL ?? API_BASE_URL;
+            const url = error.config?.url ?? '/notifications/register-device';
+            const method = String(error.config?.method ?? 'post').toUpperCase();
+            console.error('Failed to register device token (axios):', {
+                method,
+                url: `${baseURL ?? ''}${url}`,
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message,
+            });
+        } else {
+            console.error('Failed to register device token:', error);
+        }
         throw error;
     }
 };

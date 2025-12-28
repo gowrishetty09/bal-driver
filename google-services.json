@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "151159935112",
+    "project_id": "balimo",
+    "storage_bucket": "balimo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:151159935112:android:b1f08105e1809e1bd24f3d",
+        "android_client_info": {
+          "package_name": "com.bal.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxp2nKZYo9kE3scrNzwLacbPqNzL95YG8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

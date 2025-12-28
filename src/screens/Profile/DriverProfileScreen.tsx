@@ -14,6 +14,31 @@ import { getErrorMessage } from '../../utils/errors';
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ProfileStackParamList } from '../../types/navigation';
 
+type LocationCoordinates = { latitude: number; longitude: number };
+
+type DriverUser = {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  vehicleNumber?: string | null;
+  status?: string | null;
+  licenseNumber?: string | null;
+  lastLocation?: {
+    latitude: number;
+    longitude: number;
+    updatedAt?: string | null;
+  } | null;
+};
+
+type ProfileUpdate = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  licenseNumber?: string;
+  status?: string;
+};
+
 const friendlyTime = (timestamp?: string | null) => {
   if (!timestamp) {
     return 'No updates yet';
@@ -45,16 +70,22 @@ const friendlyTime = (timestamp?: string | null) => {
 export const DriverProfileScreen: React.FC = () => {
   const { user, logout, updateUserProfile } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { permissionStatus, requestPermission, isSharingLocation, lastSentAt, lastKnownCoordinates } =
-    useLocationService();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const { permissionStatus, requestPermission, isSharingLocation, lastSentAt, lastKnownCoordinates } = useLocationService();
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
+  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [currentPassword, setCurrentPassword] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+  const [editName, setEditName] = useState<string>(user?.name ?? '');
+  const [editEmail, setEditEmail] = useState<string>(user?.email ?? '');
+  const [editPhone, setEditPhone] = useState<string>(user?.phone ?? '');
+  const [editLicenseNumber, setEditLicenseNumber] = useState<string>(user?.licenseNumber ?? '');
+  const [editStatus, setEditStatus] = useState<string>(user?.status ?? 'ACTIVE');
+  const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
 
-  const effectiveCoords = useMemo(() => {
+  const effectiveCoords = useMemo<LocationCoordinates | null>(() => {
     if (lastKnownCoordinates) {
       return lastKnownCoordinates;
     }
@@ -70,7 +101,7 @@ export const DriverProfileScreen: React.FC = () => {
   const lastUpdatedLabel = friendlyTime(lastSentAt ?? user?.lastLocation?.updatedAt);
   const locationDisabled = permissionStatus !== 'granted';
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     setIsLoggingOut(true);
     try {
       await logout();
@@ -79,13 +110,51 @@ export const DriverProfileScreen: React.FC = () => {
     }
   };
 
-  const resetPasswordForm = () => {
+  const resetEditForm = (): void => {
+    setEditName(user?.name ?? '');
+    setEditEmail(user?.email ?? '');
+    setEditPhone(user?.phone ?? '');
+    setEditLicenseNumber(user?.licenseNumber ?? '');
+    setEditStatus(user?.status ?? 'ACTIVE');
+  };
+
+  const handleSaveProfile = async (): Promise<void> => {
+    if (!editName.trim()) {
+      showErrorToast('Error', 'Name cannot be empty.');
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      await updateUserProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: editName.trim(),
+              email: editEmail.trim(),
+              phone: editPhone.trim(),
+              licenseNumber: editLicenseNumber.trim(),
+              status: editStatus,
+            }
+          : prev
+      );
+      showSuccessToast('Success', 'Profile updated.');
+      setShowEditModal(false);
+      resetEditForm();
+    } catch (error) {
+      const message = getErrorMessage(error, 'Unable to update profile');
+      showErrorToast('Error', message);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const resetPasswordForm = (): void => {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
   };
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = async (): Promise<void> => {
     if (!currentPassword.trim()) {
       showErrorToast('Error', 'Please enter your current password.');
       return;
@@ -120,30 +189,40 @@ export const DriverProfileScreen: React.FC = () => {
   return (
     <Screen scrollable contentContainerStyle={styles.content}>
       <View style={styles.card}>
-        <Text style={styles.title}>{user?.name ?? 'Driver'}</Text>
+        <View style={styles.profileHeaderRow}>
+          <Text style={styles.title}>Profile</Text>
+          <Pressable style={styles.editButton} onPress={() => { resetEditForm(); setShowEditModal(true); }}>
+            <Text style={styles.editButtonText}>Edit</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.subtitle}>{user?.name ?? 'Driver'}</Text>
         <Text style={styles.subtitle}>{user?.email}</Text>
         <Text style={styles.subtitle}>{user?.phone ?? 'Phone unavailable'}</Text>
+
         <View style={styles.badgesRow}>
           {user?.vehicleNumber ? <Text style={styles.badge}>{user.vehicleNumber}</Text> : null}
           {user?.status ? <Text style={styles.badge}>{user.status}</Text> : null}
         </View>
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Location Sharing</Text>
-        <Text style={styles.sectionSubtitle}>
-          {locationDisabled
-            ? 'Location sharing is disabled; dispatch cannot see your live location.'
-            : isSharingLocation
-            ? 'Sharing live location with dispatch.'
-            : 'Location sharing will resume shortly.'}
-        </Text>
-        <Text style={styles.metaText}>{`Last update: ${lastUpdatedLabel}`}</Text>
-        {effectiveCoords && typeof effectiveCoords.latitude === 'number' && typeof effectiveCoords.longitude === 'number' ? (
-          <Text style={styles.metaText}>
-            {`Lat ${effectiveCoords.latitude.toFixed(4)}, Lng ${effectiveCoords.longitude.toFixed(4)}`}
-          </Text>
-        ) : null}
+        <View style={styles.locationRow}>
+          <View style={[styles.locationDot, { backgroundColor: locationDisabled ? colors.muted : '#28a745' }]} />
+          <View style={styles.locationTextColumn}>
+            <Text style={styles.sectionSubtitle}>
+              {locationDisabled
+                ? 'Location sharing is disabled; dispatch cannot see your live location.'
+                : isSharingLocation
+                ? 'Sharing live location with dispatch.'
+                : 'Location sharing will resume shortly.'}
+            </Text>
+            <Text style={styles.metaText}>{`Last update: ${lastUpdatedLabel}`}</Text>
+            {effectiveCoords && typeof effectiveCoords.latitude === 'number' && typeof effectiveCoords.longitude === 'number' ? (
+              <Text style={styles.metaText}>
+                {`Lat ${effectiveCoords.latitude.toFixed(4)}, Lng ${effectiveCoords.longitude.toFixed(4)}`}
+              </Text>
+            ) : null}
+          </View>
+        </View>
 
         {locationDisabled && (
           <Pressable style={styles.secondaryButton} onPress={requestPermission}>
@@ -152,18 +231,7 @@ export const DriverProfileScreen: React.FC = () => {
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Profile Actions</Text>
-        <Pressable 
-          style={styles.secondaryButton} 
-          onPress={() => setShowPasswordModal(true)}
-        >
-          <Text style={styles.secondaryButtonLabel}>Change Password</Text>
-        </Pressable>
-        <Pressable style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
-          {isLoggingOut ? <ActivityIndicator color="#fff" /> : <Text style={styles.logoutLabel}>Logout</Text>}
-        </Pressable>
-      </View>
+      {/* Change Password & Logout buttons (kept at end of page, outside a card) */}
 
       {/* Feedback & Help Card */}
       <View style={styles.card}>
@@ -188,6 +256,113 @@ export const DriverProfileScreen: React.FC = () => {
           <Ionicons name="chevron-forward" size={20} color="#fff" style={styles.chevron} />
         </Pressable>
       </View>
+      {/* Change Password & Logout buttons (end of page) */}
+      <View>
+        <Pressable 
+          style={styles.secondaryButton} 
+          onPress={() => setShowPasswordModal(true)}
+        >
+          <Text style={styles.secondaryButtonLabel}>Change Password</Text>
+        </Pressable>
+        <Pressable style={styles.logoutButton} onPress={handleLogout} disabled={isLoggingOut}>
+          {isLoggingOut ? <ActivityIndicator color="#fff" /> : <Text style={styles.logoutLabel}>Logout</Text>}
+        </Pressable>
+      </View>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setShowEditModal(false);
+          resetEditForm();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Name"
+              placeholderTextColor={colors.muted}
+              value={editName}
+              onChangeText={setEditName}
+            />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Email"
+              placeholderTextColor={colors.muted}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Phone"
+              placeholderTextColor={colors.muted}
+              value={editPhone}
+              onChangeText={setEditPhone}
+              keyboardType="phone-pad"
+            />
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="License Number"
+              placeholderTextColor={colors.muted}
+              value={editLicenseNumber}
+              onChangeText={setEditLicenseNumber}
+            />
+
+            <View style={{ marginBottom: 12 }}>
+              <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>Status</Text>
+              <View style={styles.statusRow}>
+                <Pressable
+                  style={[styles.statusButton, editStatus === 'ACTIVE' && styles.statusButtonActive]}
+                  onPress={() => setEditStatus('ACTIVE')}
+                >
+                  <Text style={[styles.statusButtonText, editStatus === 'ACTIVE' && styles.statusButtonTextActive]}>ACTIVE</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.statusButton, editStatus === 'INACTIVE' && styles.statusButtonActive]}
+                  onPress={() => setEditStatus('INACTIVE')}
+                >
+                  <Text style={[styles.statusButtonText, editStatus === 'INACTIVE' && styles.statusButtonTextActive]}>INACTIVE</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setShowEditModal(false);
+                  resetEditForm();
+                }}
+                disabled={isSavingProfile}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalSubmitButton, isSavingProfile && styles.disabledButton]}
+                onPress={handleSaveProfile}
+                disabled={isSavingProfile}
+              >
+                {isSavingProfile ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Change Password Modal */}
       <Modal
@@ -293,6 +468,24 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
+  profileHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  editButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: 'transparent',
+  },
+  editButtonText: {
+    color: colors.primary,
+    fontFamily: typography.fontFamilyMedium,
+  },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -300,6 +493,45 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     color: colors.text,
     fontSize: typography.caption,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 12,
+  },
+  locationDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 6,
+    marginRight: 10,
+  },
+  locationTextColumn: {
+    flex: 1,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statusButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  statusButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  statusButtonText: {
+    color: colors.muted,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  statusButtonTextActive: {
+    color: '#fff',
   },
   sectionTitle: {
     fontSize: typography.subheading,
