@@ -1,6 +1,9 @@
 import Constants from 'expo-constants';
 
-const extra = (Constants.expoConfig ?? Constants.manifest)?.extra ?? {};
+// Safely access `extra` coming from either `expoConfig` or `manifest`.
+// Different Expo runtime types may not expose `extra` on the manifest type,
+// so coerce to `any` to avoid TypeScript errors while preserving runtime behavior.
+const extra = (((Constants as unknown) as any).expoConfig ?? ((Constants as unknown) as any).manifest)?.extra ?? {};
 const env = process.env as Record<string, string | undefined>;
 
 const fromEnv = (key: string, fallback?: string) => {

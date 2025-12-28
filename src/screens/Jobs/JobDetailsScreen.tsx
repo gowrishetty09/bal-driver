@@ -34,6 +34,7 @@ import { getErrorMessage } from '../../utils/errors';
 import { showErrorToast, showSuccessToast, showInfoToast } from '../../utils/toast';
 import { emitJobRefresh } from '../../utils/events';
 import { socketService } from '../../services/socketService';
+import { formatMYR, shortBookingRef, bookingRefFull } from '../../utils/format';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -371,6 +372,41 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
   const isJobTerminal = job ? TERMINAL_STATUSES.includes(job.status) : false;
 
+  const getStatusColor = (status?: JobStatus) => {
+    switch (status) {
+      case 'COMPLETED':
+        return '#2E7D32'; // green
+      case 'CANCELLED':
+        return '#C62828'; // red
+      case 'PICKED_UP':
+        return '#1565C0'; // blue
+      case 'ARRIVED':
+        return '#F9A825'; // amber
+      default:
+        return colors.border;
+    }
+  };
+
+  const confirmCashAndComplete = useCallback(() => {
+    if (!job) return;
+    Alert.alert(
+      'Confirm cash received',
+      'Have you received the cash payment from the passenger?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, received',
+          onPress: async () => {
+            // Use reason to indicate cash received; backend may record payment when completing
+            await performStatusUpdate('COMPLETED', 'CASH_PAID');
+            // Ensure UI reflects payment status
+            setJob((prev) => prev ? { ...prev, paymentStatus: 'PAID' } : prev);
+          },
+        },
+      ]
+    );
+  }, [job, performStatusUpdate]);
+
   const handleCallPassenger = useCallback(() => {
     if (!job || !job.passengerPhone || job.passengerPhone.trim() === '') {
       Alert.alert('No phone number', 'Customer phone number is not available.');
@@ -661,7 +697,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <View style={styles.overlayPaymentItem}>
               <Text style={styles.overlayPaymentLabel}>Fare</Text>
               <Text style={styles.overlayPaymentValue}>
-                {job.paymentAmount != null && job.paymentAmount > 0 ? `₹${job.paymentAmount}` : '—'}
+                {job.paymentAmount != null && job.paymentAmount > 0 ? formatMYR(job.paymentAmount) : '—'}
               </Text>
             </View>
             <View style={styles.overlayPaymentItem}>
@@ -702,7 +738,17 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear) &&
                     styles.actionButtonDisabledStyle
                 ]}
-                onPress={() => handleStatusUpdate(nextStatus)}
+                onPress={() => {
+                  if (
+                    nextStatus === 'COMPLETED' &&
+                    (job.paymentMethod ?? '').toUpperCase() === 'CASH' &&
+                    job.paymentStatus !== 'PAID'
+                  ) {
+                    confirmCashAndComplete();
+                  } else {
+                    handleStatusUpdate(nextStatus);
+                  }
+                }}
                 disabled={
                   actionLoading ||
                   (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear)
@@ -720,7 +766,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   >
                     {nextStatus === 'ARRIVED' && 'Mark as Arrived'}
                     {nextStatus === 'PICKED_UP' && 'Mark Pickup'}
-                    {nextStatus === 'COMPLETED' && 'Mark Completed'}
+                    {nextStatus === 'COMPLETED' &&
+                      ((job.paymentMethod ?? '').toUpperCase() === 'CASH' && job.paymentStatus !== 'PAID'
+                        ? 'Confirm Cash Received'
+                        : 'Mark Completed')}
                   </Text>
                 )}
               </Pressable>
@@ -785,7 +834,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.jobId}>Ref: {job.reference}</Text>
+            <Text style={styles.jobId}>Ref: {shortBookingRef(job.id)}</Text>
             <Text style={[styles.subtle, { marginTop: 6 }]}>Vehicle: {job.vehiclePlate ?? '—'}</Text>
           </View>
           <View style={styles.statusChip}>
@@ -875,7 +924,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Estimated Fare</Text>
             <Text style={styles.metaValue}>{
-               job.paymentAmount != null && job.paymentAmount > 0 ? `₹${job.paymentAmount}` : '—'
+              job.paymentAmount != null && job.paymentAmount > 0 ? formatMYR(job.paymentAmount) : '—'
             }</Text>
           </View>
           {isAirportTransfer && job.flightNo ? (
@@ -906,23 +955,25 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Status Timeline</Text>
-          {timelineItems.map((item) => {
-            const isActive = item.status === job.status;
-            return (
-              <View key={`${item.status}-${item.timestamp}`} style={styles.timelineRow}>
-                <View style={[styles.timelineIndicator, isActive && styles.timelineIndicatorActive]} />
-                <View>
-                  <Text style={[styles.timelineStatus, isActive && styles.timelineStatusActive]}>
-                    {STATUS_LABELS[item.status]}
-                  </Text>
-                  <Text style={styles.subtle}>{formatDateTime(item.timestamp)}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+          {!isJobTerminal && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Status Timeline</Text>
+              {timelineItems.map((item) => {
+                const isActive = item.status === job.status;
+                return (
+                  <View key={`${item.status}-${item.timestamp}`} style={styles.timelineRow}>
+                    <View style={[styles.timelineIndicator, isActive && styles.timelineIndicatorActive]} />
+                    <View>
+                      <Text style={[styles.timelineStatus, isActive && styles.timelineStatusActive]}>
+                        {STATUS_LABELS[item.status]}
+                      </Text>
+                      <Text style={styles.subtle}>{formatDateTime(item.timestamp)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
         {!isJobTerminal && (
           <View style={styles.section}>
@@ -941,13 +992,27 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   styles.primaryAction,
                   (hasInProgressRide && nextStatus === 'EN_ROUTE') && styles.primaryActionDisabled
                 ]} 
-                onPress={() => handleStatusUpdate(nextStatus)} 
+                onPress={() => {
+                  if (
+                    nextStatus === 'COMPLETED' &&
+                    (job.paymentMethod ?? '').toUpperCase() === 'CASH' &&
+                    job.paymentStatus !== 'PAID'
+                  ) {
+                    confirmCashAndComplete();
+                  } else {
+                    handleStatusUpdate(nextStatus);
+                  }
+                }}
                 disabled={actionLoading || (hasInProgressRide && nextStatus === 'EN_ROUTE')}
               >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.primaryActionLabel}>{`Mark as ${STATUS_LABELS[nextStatus]}`}</Text>
+                  <Text style={styles.primaryActionLabel}>{
+                    nextStatus === 'COMPLETED' && (job.paymentMethod ?? '').toUpperCase() === 'CASH' && job.paymentStatus !== 'PAID'
+                      ? 'Confirm Cash Received'
+                      : `Mark as ${STATUS_LABELS[nextStatus]}`
+                  }</Text>
                 )}
               </Pressable>
             )}

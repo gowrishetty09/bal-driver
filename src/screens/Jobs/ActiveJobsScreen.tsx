@@ -55,7 +55,7 @@ export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
     >
       <View style={styles.cardHeader}>
         <View>
-          <Text style={styles.jobId}>{item.reference}</Text>
+          <Text style={styles.jobId}>#{item.id.slice(-8)}</Text>
           <Text style={styles.subtle}>{item.vehicleNumber ?? '—'}</Text>
         </View>
         <View style={styles.statusBadge}>

@@ -113,7 +113,7 @@ let mockTickets: TicketDetail[] = [
     {
         id: 'TICKET-100',
         subject: 'Incorrect fare credited',
-        description: 'Ride REF-12877 credited ₹20 less',
+        description: 'Ride REF-12877 credited RM20 less',
         category: 'PAYMENT_ISSUE',
         status: 'OPEN',
         priority: 'NORMAL',
@@ -123,8 +123,8 @@ let mockTickets: TicketDetail[] = [
             {
                 id: 'msg-1',
                 authorType: 'DRIVER',
-                body: 'Payment seems short by ₹20, please verify.',
-                message: 'Payment seems short by ₹20, please verify.',
+                body: 'Payment seems short by RM20, please verify.',
+                message: 'Payment seems short by RM20, please verify.',
                 createdAt: new Date().toISOString(),
             },
             {
