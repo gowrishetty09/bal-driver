@@ -206,6 +206,73 @@ export const updateDriverJobStatus = async (
     }
 };
 
+export type PickupCodeVerificationError = 'INVALID_CODE' | 'CODE_LOCKED';
+
+export type VerifyPickupCodeResult =
+    | { ok: true }
+    | { ok: false; error: PickupCodeVerificationError; message?: string };
+
+const extractPickupCodeVerificationError = (data: unknown): PickupCodeVerificationError | null => {
+    if (!data || typeof data !== 'object') return null;
+    const anyData = data as any;
+    const code = anyData.code ?? anyData.error ?? anyData.status;
+    if (code === 'INVALID_CODE' || code === 'CODE_LOCKED') return code;
+    return null;
+};
+
+/**
+ * Verify pickup code before starting ride.
+ *
+ * Backend variants supported:
+ * - POST /bookings/:id/verify-pickup-code  { code }
+ * - POST /driver/jobs/:id/accept          { code }
+ */
+export const verifyPickupCode = async (bookingId: string, code: string): Promise<VerifyPickupCodeResult> => {
+    const payload = { code };
+
+    const postVerify = async (path: string) => {
+        await apiClient.post(path, payload);
+    };
+
+    try {
+        await postVerify(`/bookings/${bookingId}/verify-pickup-code`);
+        return { ok: true };
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            const status = error.response?.status;
+            const data = error.response?.data;
+            const extracted = extractPickupCodeVerificationError(data);
+            if (extracted) {
+                return { ok: false, error: extracted, message: (data as any)?.message };
+            }
+
+            // If endpoint doesn't exist on this backend, fall back to the legacy accept route.
+            // This is NOT a retry for invalid codes; it only handles backend route differences.
+            if (status === 404 || status === 405) {
+                try {
+                    await postVerify(`/driver/jobs/${bookingId}/accept`);
+                    return { ok: true };
+                } catch (fallbackError) {
+                    if (axios.isAxiosError(fallbackError)) {
+                        const fallbackData = fallbackError.response?.data;
+                        const fallbackExtracted = extractPickupCodeVerificationError(fallbackData);
+                        if (fallbackExtracted) {
+                            return {
+                                ok: false,
+                                error: fallbackExtracted,
+                                message: (fallbackData as any)?.message,
+                            };
+                        }
+                    }
+                    throw fallbackError;
+                }
+            }
+        }
+
+        throw error;
+    }
+};
+
 /**
  * Notify backend when driver arrives at pickup location
  * This triggers notifications to admin and customer

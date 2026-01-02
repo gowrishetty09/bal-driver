@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useNavigation } from "@react-navigation/native";
 
 import { Screen } from "../../components/Screen";
 import { FeedbackPrompt } from "../../components/FeedbackPrompt";
@@ -32,6 +33,7 @@ import {
   getDriverJobDetails,
   getDriverJobs,
   updateDriverJobStatus,
+  verifyPickupCode,
   notifyDriverArrival,
 } from "../../api/driver";
 import { getErrorMessage } from "../../utils/errors";
@@ -45,6 +47,8 @@ import { socketService } from "../../services/socketService";
 import { formatMYR, shortBookingRef, bookingRefFull } from "../../utils/format";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+const PICKUP_CODE_LENGTH = 6;
 
 // Pickup proximity threshold in meters (100m radius)
 const PICKUP_PROXIMITY_THRESHOLD_METERS = 200;
@@ -97,6 +101,7 @@ type Props = NativeStackScreenProps<CombinedStackParamList, "JobDetails">;
 
 export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const { jobId } = route.params ?? {};
+  const rootNavigation = useNavigation<any>();
   const [job, setJob] = useState<DriverJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -106,8 +111,15 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [hasInProgressRide, setHasInProgressRide] = useState(false);
   const [inProgressRideId, setInProgressRideId] = useState<string | null>(null);
-  const [pickupOtpModalVisible, setPickupOtpModalVisible] = useState(false);
-  const [pickupOtp, setPickupOtp] = useState("");
+  const [pickupCodeModalVisible, setPickupCodeModalVisible] = useState(false);
+  const [pickupCode, setPickupCode] = useState("");
+  const [awaitingRideStartConfirmation, setAwaitingRideStartConfirmation] =
+    useState(false);
+
+  const canSubmitPickupCode = useMemo(() => {
+    const normalized = pickupCode.trim();
+    return normalized.length === PICKUP_CODE_LENGTH;
+  }, [pickupCode]);
 
   // Use global location service
   const {
@@ -245,6 +257,71 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     }
   }, [jobId]);
 
+  // Join booking room for realtime events and gate ride-start UI on socket confirmation.
+  useEffect(() => {
+    if (!job?.id) {
+      return;
+    }
+
+    socketService.joinBookingRoom(job.id);
+
+    const extractBookingId = (payload: any): string | null => {
+      if (!payload || typeof payload !== "object") return null;
+      return (
+        payload.bookingId ??
+        payload.id ??
+        payload.jobId ??
+        payload.booking?.id ??
+        payload.job?.id ??
+        null
+      );
+    };
+
+    const extractStatus = (payload: any): string | null => {
+      if (!payload || typeof payload !== "object") return null;
+      return payload.status ?? payload.booking?.status ?? payload.job?.status;
+    };
+
+    const onRideStarted = (payload: any) => {
+      const bookingIdFromEvent = extractBookingId(payload);
+      if (!bookingIdFromEvent || bookingIdFromEvent !== job.id) return;
+
+      setAwaitingRideStartConfirmation(false);
+      setPickupCodeModalVisible(false);
+      setPickupCode("");
+
+      void fetchDetails();
+      emitJobRefresh();
+      showSuccessToast("Ride started", "Pickup confirmed.");
+
+      // Ensure the driver lands in Active tab after ride is started.
+      rootNavigation.navigate("ActiveJobsTab", {
+        screen: "JobDetails",
+        params: { jobId: job.id },
+      });
+    };
+
+    // Primary: explicit event from backend.
+    socketService.on("RIDE_STARTED", onRideStarted);
+
+    // Compatibility: treat status updates to PICKED_UP as confirmation.
+    const onStatusUpdated = (payload: any) => {
+      const bookingIdFromEvent = extractBookingId(payload);
+      if (!bookingIdFromEvent || bookingIdFromEvent !== job.id) return;
+      const status = extractStatus(payload);
+      if (status === "PICKED_UP") {
+        onRideStarted(payload);
+      }
+    };
+    socketService.on("BOOKING_STATUS_UPDATED", onStatusUpdated);
+
+    return () => {
+      socketService.off("RIDE_STARTED", onRideStarted);
+      socketService.off("BOOKING_STATUS_UPDATED", onStatusUpdated);
+      socketService.leaveBookingRoom(job.id);
+    };
+  }, [job?.id, fetchDetails, rootNavigation]);
+
   useEffect(() => {
     fetchDetails();
     checkForInProgressRides();
@@ -286,7 +363,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   }, [job?.id, job?.status, setActiveBookingId]);
 
   const performStatusUpdate = useCallback(
-    async (nextStatus: JobStatus, reason?: string, otp?: string) => {
+    async (nextStatus: JobStatus, reason?: string) => {
       if (!job) {
         return;
       }
@@ -306,8 +383,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         const updatedJob = await updateDriverJobStatus(
           job.id,
           nextStatus,
-          reason,
-          otp
+          reason
         );
         // Merge updated job with existing job data to preserve fields like coordinates
         // that may not be returned by the status update endpoint
@@ -349,8 +425,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setActionLoading(false);
         setCancelModalVisible(false);
         setCancelReason("");
-        setPickupOtpModalVisible(false);
-        setPickupOtp("");
+        setPickupCodeModalVisible(false);
+        setPickupCode("");
+        setAwaitingRideStartConfirmation(false);
       }
     },
     [job, hasInProgressRide, notifyArrival, checkForInProgressRides]
@@ -832,7 +909,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 ]}
                 onPress={() => {
                   if (nextStatus === "PICKED_UP") {
-                    setPickupOtpModalVisible(true);
+                    setPickupCodeModalVisible(true);
                     return;
                   }
                   if (
@@ -865,7 +942,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     ]}
                   >
                     {nextStatus === "ARRIVED" && "Mark as Arrived"}
-                    {nextStatus === "PICKED_UP" && "Mark Pickup"}
+                    {nextStatus === "PICKED_UP" && "Start Ride"}
                     {nextStatus === "COMPLETED" &&
                       ((job.paymentMethod ?? "").toUpperCase() === "CASH" &&
                       job.paymentStatus !== "PAID"
@@ -884,60 +961,118 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           </View>
         </ScrollView>
 
-        {/* Pickup OTP Modal */}
+        {/* Pickup Code Modal */}
         <Modal
-          visible={pickupOtpModalVisible}
+          visible={pickupCodeModalVisible}
           animationType="slide"
           transparent
         >
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
-              <Text style={styles.sectionTitle}>Enter Pickup OTP</Text>
+              <Text style={styles.sectionTitle}>Enter Pickup Code</Text>
               <Text style={styles.subtle}>
-                Ask the customer for the OTP to start the ride.
+                Ask the customer for the pickup code to start the ride.
               </Text>
+              {awaitingRideStartConfirmation && (
+                <Text style={styles.subtle}>
+                  Code accepted. Waiting for confirmation…
+                </Text>
+              )}
               <TextInput
                 style={styles.modalInput}
-                placeholder="Enter OTP"
+                placeholder={`Enter ${PICKUP_CODE_LENGTH}-digit code`}
                 placeholderTextColor={colors.muted}
                 keyboardType="number-pad"
-                value={pickupOtp}
+                value={pickupCode}
                 onChangeText={(value) =>
-                  setPickupOtp(value.replace(/[^0-9]/g, ""))
+                  setPickupCode(value.replace(/[^0-9]/g, ""))
                 }
-                maxLength={6}
+                maxLength={PICKUP_CODE_LENGTH}
+                editable={!actionLoading && !awaitingRideStartConfirmation}
               />
               <View style={styles.modalActions}>
                 <Pressable
                   style={styles.modalSecondary}
                   onPress={() => {
-                    setPickupOtpModalVisible(false);
-                    setPickupOtp("");
+                    if (awaitingRideStartConfirmation) {
+                      return;
+                    }
+                    setPickupCodeModalVisible(false);
+                    setPickupCode("");
                   }}
-                  disabled={actionLoading}
+                  disabled={actionLoading || awaitingRideStartConfirmation}
                 >
                   <Text style={styles.secondaryActionLabel}>Cancel</Text>
                 </Pressable>
                 <Pressable
                   style={styles.modalPrimary}
                   onPress={() => {
-                    const normalizedOtp = pickupOtp.trim();
-                    if (normalizedOtp.length < 4) {
+                    if (!job) return;
+                    if (awaitingRideStartConfirmation) return;
+
+                    const normalizedCode = pickupCode.trim();
+                    if (normalizedCode.length !== PICKUP_CODE_LENGTH) {
                       Alert.alert(
-                        "Invalid OTP",
-                        "Please enter a valid OTP to start the ride."
+                        "Invalid code",
+                        `Please enter the ${PICKUP_CODE_LENGTH}-digit pickup code to start the ride.`
                       );
                       return;
                     }
-                    void performStatusUpdate(
-                      "PICKED_UP",
-                      undefined,
-                      normalizedOtp
-                    );
+
+                    setActionLoading(true);
+                    setPickupCode("");
+
+                    void (async () => {
+                      try {
+                        const result = await verifyPickupCode(
+                          job.id,
+                          normalizedCode
+                        );
+
+                        if (result.ok) {
+                          setAwaitingRideStartConfirmation(true);
+                          showInfoToast(
+                            "Pickup code verified",
+                            "Waiting for ride start confirmation…"
+                          );
+                          return;
+                        }
+
+                        if (result.error === "INVALID_CODE") {
+                          showErrorToast(
+                            "Invalid code",
+                            result.message ??
+                              "Pickup code is incorrect. Please try again."
+                          );
+                          return;
+                        }
+
+                        if (result.error === "CODE_LOCKED") {
+                          Alert.alert(
+                            "Code locked",
+                            result.message ??
+                              "Too many attempts. Please contact support."
+                          );
+                          return;
+                        }
+                      } catch (error) {
+                        const message = getErrorMessage(
+                          error,
+                          "Failed to verify pickup code"
+                        );
+                        showErrorToast("Verification failed", message);
+                      } finally {
+                        setActionLoading(false);
+                      }
+                    })();
                   }}
-                  disabled={actionLoading}
+                  disabled={
+                    actionLoading ||
+                    awaitingRideStartConfirmation ||
+                    !canSubmitPickupCode
+                  }
                 >
-                  {actionLoading ? (
+                  {actionLoading || awaitingRideStartConfirmation ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text style={styles.primaryActionLabel}>
