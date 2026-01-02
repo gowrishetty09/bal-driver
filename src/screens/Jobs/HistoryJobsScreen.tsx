@@ -1,78 +1,76 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View, TextInput } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 
-import { Screen } from '../../components/Screen';
-import { LocationStatusBanner } from '../../components/LocationStatusBanner';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { HistoryJobsStackParamList } from '../../types/navigation';
-import { DriverJob, getDriverJobs } from '../../api/driver';
-import { formatMYR, shortBookingRef } from '../../utils/format';
-import { getErrorMessage } from '../../utils/errors';
-import { showErrorToast } from '../../utils/toast';
-import { subscribeJobRefresh } from '../../utils/events';
+import { Screen } from "../../components/Screen";
+import { LocationStatusBanner } from "../../components/LocationStatusBanner";
+import { colors } from "../../theme/colors";
+import { typography } from "../../theme/typography";
+import { HistoryJobsStackParamList } from "../../types/navigation";
+import { DriverJob } from "../../api/driver";
+import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
+import { formatMYR, shortBookingRef } from "../../utils/format";
 
-type Props = NativeStackScreenProps<HistoryJobsStackParamList, 'HistoryJobs'>;
+type Props = NativeStackScreenProps<HistoryJobsStackParamList, "HistoryJobs">;
 
 export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
-  const [jobs, setJobs] = useState<DriverJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadJobs = useCallback(async () => {
-    try {
-      const data = await getDriverJobs('HISTORY');
-      setJobs(data);
-    } catch (error) {
-      const message = getErrorMessage(error, 'Unable to load history');
-      showErrorToast('History', message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const {
+    bookings: jobs,
+    isLoading: loading,
+    refreshing,
+    refresh,
+  } = useRealtimeJobs("HISTORY");
 
   useFocusEffect(
     useCallback(() => {
-      loadJobs();
-      const subscription = subscribeJobRefresh(loadJobs);
-      return () => subscription.remove();
-    }, [loadJobs])
+      // Realtime updates are handled by the socket listeners inside useRealtimeJobs.
+      return () => undefined;
+    }, [])
   );
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadJobs();
-  }, [loadJobs]);
+    refresh();
+  }, [refresh]);
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
 
   const filteredJobs = useMemo(() => {
-    if (!query || query.trim() === '') return jobs;
+    if (!query || query.trim() === "") return jobs;
     const q = query.trim().toLowerCase();
     return jobs.filter((j) => {
       const shortRef = shortBookingRef(j.id).toLowerCase();
       const idMatch = j.id?.toLowerCase().includes(q) || shortRef.includes(q);
-      const nameMatch = (j.passengerName ?? '').toLowerCase().includes(q);
-      const vehicleMatch = (j.vehicleNumber ?? '').toLowerCase().includes(q);
+      const nameMatch = (j.passengerName ?? "").toLowerCase().includes(q);
+      const vehicleMatch = (j.vehicleNumber ?? "").toLowerCase().includes(q);
       return idMatch || nameMatch || vehicleMatch;
     });
   }, [jobs, query]);
 
   const renderItem = ({ item }: { item: DriverJob }) => {
-    const fareValue = typeof item.paymentAmount === 'number' ? item.paymentAmount : 0;
+    const fareValue =
+      typeof item.paymentAmount === "number" ? item.paymentAmount : 0;
     const shortRef = shortBookingRef(item.id);
-    const pickupTime = item.scheduledTime ? new Date(item.scheduledTime).toLocaleString() : '—';
+    const pickupTime = item.scheduledTime
+      ? new Date(item.scheduledTime).toLocaleString()
+      : "—";
     // Drop time not always available in summary list
-    const dropTime = '—';
+    const dropTime = "—";
     const statusColor = (status?: string) => {
       switch (status) {
-        case 'COMPLETED':
-          return '#2E7D32';
-        case 'CANCELLED':
-          return '#C62828';
+        case "COMPLETED":
+          return "#2E7D32";
+        case "CANCELLED":
+          return "#C62828";
         default:
           return colors.border;
       }
@@ -80,19 +78,32 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
 
     return (
       <Pressable
-        style={[styles.card, { borderLeftWidth: 6, borderLeftColor: statusColor(item.status) }]}
-        onPress={() => navigation.navigate('JobDetails', { jobId: item.id })}
+        style={[
+          styles.card,
+          { borderLeftWidth: 6, borderLeftColor: statusColor(item.status) },
+        ]}
+        onPress={() => navigation.navigate("JobDetails", { jobId: item.id })}
       >
         <View style={styles.cardLeft}>
-          <Text style={styles.jobId} numberOfLines={1} ellipsizeMode="tail">{shortRef}</Text>
-          <Text style={styles.passenger} numberOfLines={1} ellipsizeMode="tail">{item.passengerName}</Text>
-          <Text style={styles.subtle} numberOfLines={1} ellipsizeMode="tail">{item.vehicleNumber ?? '—'}</Text>
-          <Text style={styles.times} numberOfLines={1} ellipsizeMode="tail">{`Pickup: ${pickupTime} • Drop: ${dropTime}`}</Text>
+          <Text style={styles.jobId} numberOfLines={1} ellipsizeMode="tail">
+            {shortRef}
+          </Text>
+          <Text style={styles.passenger} numberOfLines={1} ellipsizeMode="tail">
+            {item.passengerName}
+          </Text>
+          <Text style={styles.subtle} numberOfLines={1} ellipsizeMode="tail">
+            {item.vehicleNumber ?? "—"}
+          </Text>
+          <Text
+            style={styles.times}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >{`Pickup: ${pickupTime} • Drop: ${dropTime}`}</Text>
         </View>
         <Text
           style={[
             styles.amount,
-            item.status === 'CANCELLED' && styles.amountCancelled,
+            item.status === "CANCELLED" && styles.amountCancelled,
           ]}
           numberOfLines={1}
           ellipsizeMode="tail"
@@ -122,8 +133,8 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
           onChangeText={setQuery}
           returnKeyType="search"
         />
-        {query !== '' && (
-          <Pressable style={styles.clearButton} onPress={() => setQuery('')}>
+        {query !== "" && (
+          <Pressable style={styles.clearButton} onPress={() => setQuery("")}>
             <Text style={styles.clearButtonText}>✕</Text>
           </Pressable>
         )}
@@ -132,12 +143,18 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
       <LocationStatusBanner />
       <FlatList
         style={styles.list}
-        contentContainerStyle={filteredJobs.length ? styles.listContent : styles.empty}
+        contentContainerStyle={
+          filteredJobs.length ? styles.listContent : styles.empty
+        }
         data={filteredJobs}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>Completed rides will show here.</Text>}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>Completed rides will show here.</Text>
+        }
       />
     </Screen>
   );
@@ -151,15 +168,15 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderColor: colors.border,
     borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   cardLeft: {
     flex: 1,
@@ -182,10 +199,10 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyMedium,
     color: colors.accent,
     minWidth: 84,
-    textAlign: 'right',
+    textAlign: "right",
   },
   amountCancelled: {
-    textDecorationLine: 'line-through',
+    textDecorationLine: "line-through",
     color: colors.muted,
   },
   times: {
@@ -194,11 +211,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 0,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
     borderBottomColor: colors.pagegold,
   },
@@ -209,7 +226,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: colors.border,
     paddingHorizontal: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     color: colors.text,
   },
   clearButton: {
@@ -217,8 +234,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.background,
   },
   clearButtonText: {
@@ -226,13 +243,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   loaderContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   empty: {
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 16,
   },
   emptyText: {

@@ -1,73 +1,68 @@
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
 
-import { Screen } from '../../components/Screen';
-import { LocationStatusBanner } from '../../components/LocationStatusBanner';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { ActiveJobsStackParamList } from '../../types/navigation';
-import { DriverJob, getDriverJobs } from '../../api/driver';
-import { getErrorMessage } from '../../utils/errors';
-import { showErrorToast } from '../../utils/toast';
-import { subscribeJobRefresh } from '../../utils/events';
+import { Screen } from "../../components/Screen";
+import { LocationStatusBanner } from "../../components/LocationStatusBanner";
+import { colors } from "../../theme/colors";
+import { typography } from "../../theme/typography";
+import { ActiveJobsStackParamList } from "../../types/navigation";
+import { DriverJob } from "../../api/driver";
+import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
 
-type Props = NativeStackScreenProps<ActiveJobsStackParamList, 'ActiveJobs'>;
+type Props = NativeStackScreenProps<ActiveJobsStackParamList, "ActiveJobs">;
 
 export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
-  const [jobs, setJobs] = useState<DriverJob[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadJobs = useCallback(async () => {
-    try {
-      const data = await getDriverJobs('ACTIVE');
-      setJobs(data);
-    } catch (error) {
-      const message = getErrorMessage(error, 'Unable to load active jobs');
-      showErrorToast('Active jobs', message);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const {
+    bookings: jobs,
+    isLoading,
+    refreshing,
+    refresh,
+  } = useRealtimeJobs("ACTIVE");
 
   useFocusEffect(
     useCallback(() => {
-      loadJobs();
-      const subscription = subscribeJobRefresh(loadJobs);
-      return () => {
-        subscription.remove();
-      };
-    }, [loadJobs])
+      // Keep existing focus behavior minimal: no forced refetch.
+      // Realtime updates are handled by the socket listeners inside useRealtimeJobs.
+      return () => undefined;
+    }, [])
   );
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadJobs();
-  }, [loadJobs]);
+    refresh();
+  }, [refresh]);
 
   const renderItem = ({ item }: { item: DriverJob }) => (
-    <Pressable 
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} 
-      onPress={() => navigation.navigate('JobDetails', { jobId: item.id })}
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={() => navigation.navigate("JobDetails", { jobId: item.id })}
     >
       <View style={styles.cardHeader}>
         <View>
           <Text style={styles.jobId}>#{item.id.slice(-8)}</Text>
-          <Text style={styles.subtle}>{item.vehicleNumber ?? '—'}</Text>
+          <Text style={styles.subtle}>{item.vehicleNumber ?? "—"}</Text>
         </View>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>{item.status}</Text>
         </View>
       </View>
-      <Text style={styles.passenger}>{item.passengerName || 'Customer'}</Text>
-      <Text style={styles.route}>{`${item.pickup?.addressLine ?? '—'} → ${
-        item.dropoff?.addressLine ?? '—'
+      <Text style={styles.passenger}>{item.passengerName || "Customer"}</Text>
+      <Text style={styles.route}>{`${item.pickup?.addressLine ?? "—"} → ${
+        item.dropoff?.addressLine ?? "—"
       }`}</Text>
       <View style={styles.cardFooter}>
-        <Text style={styles.eta}>{new Date(item.scheduledTime).toLocaleTimeString()}</Text>
+        <Text style={styles.eta}>
+          {new Date(item.scheduledTime).toLocaleTimeString()}
+        </Text>
         <Text style={styles.tapHint}>Tap to view details →</Text>
       </View>
     </Pressable>
@@ -90,8 +85,12 @@ export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
         data={jobs}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>No active jobs assigned.</Text>}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No active jobs assigned.</Text>
+        }
       />
     </Screen>
   );
@@ -105,13 +104,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   loaderContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   empty: {
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 16,
   },
   emptyText: {
@@ -119,13 +118,13 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderColor: colors.border,
     borderWidth: 1,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -136,9 +135,9 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   statusBadge: {
@@ -148,7 +147,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: typography.caption,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -172,9 +171,9 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
