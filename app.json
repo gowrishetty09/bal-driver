@@ -23,6 +23,7 @@
     },
     "android": {
       "package": "com.bal.driver",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/AppIcons/playstore.png",
         "backgroundColor": "#151e2d"
