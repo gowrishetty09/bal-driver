@@ -4,6 +4,23 @@
     "appVersionSource": "local"
   },
   "build": {
+    "debug": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Debug"
+      }
+    },
+    "debug-ios-simulator": {
+      "developmentClient": true,
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Debug"
+      }
+    },
     "production": {
       "android": {
         "buildType": "app-bundle"
