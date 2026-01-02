@@ -20,6 +20,11 @@ export const USE_MOCKS: boolean =
 export const GOOGLE_PLACES_API_KEY: string | undefined =
     process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? extra.googlePlacesApiKey;
 
+// Used by RideMapView to draw turn-by-turn route polylines.
+// Falls back to the Places key since many projects use a single restricted key.
+export const GOOGLE_DIRECTIONS_API_KEY: string | undefined =
+    process.env.EXPO_PUBLIC_GOOGLE_DIRECTIONS_KEY ?? extra.googleDirectionsApiKey ?? GOOGLE_PLACES_API_KEY;
+
 type SosContacts = {
     police: string;
     medical: string;

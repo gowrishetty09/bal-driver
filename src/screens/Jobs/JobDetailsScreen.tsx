@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,16 +11,20 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-import { Screen } from '../../components/Screen';
-import { FeedbackPrompt } from '../../components/FeedbackPrompt';
-import { RideMapView } from '../../components/RideMapView';
-import { useLocationService } from '../../hooks/useLocationService';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { ActiveJobsStackParamList, HistoryJobsStackParamList, UpcomingJobsStackParamList } from '../../types/navigation';
+import { Screen } from "../../components/Screen";
+import { FeedbackPrompt } from "../../components/FeedbackPrompt";
+import { RideMapView } from "../../components/RideMapView";
+import { useLocationService } from "../../hooks/useLocationService";
+import { colors } from "../../theme/colors";
+import { typography } from "../../theme/typography";
+import {
+  ActiveJobsStackParamList,
+  HistoryJobsStackParamList,
+  UpcomingJobsStackParamList,
+} from "../../types/navigation";
 import {
   DriverJob,
   DriverJobDetail,
@@ -29,14 +33,18 @@ import {
   getDriverJobs,
   updateDriverJobStatus,
   notifyDriverArrival,
-} from '../../api/driver';
-import { getErrorMessage } from '../../utils/errors';
-import { showErrorToast, showSuccessToast, showInfoToast } from '../../utils/toast';
-import { emitJobRefresh } from '../../utils/events';
-import { socketService } from '../../services/socketService';
-import { formatMYR, shortBookingRef, bookingRefFull } from '../../utils/format';
+} from "../../api/driver";
+import { getErrorMessage } from "../../utils/errors";
+import {
+  showErrorToast,
+  showSuccessToast,
+  showInfoToast,
+} from "../../utils/toast";
+import { emitJobRefresh } from "../../utils/events";
+import { socketService } from "../../services/socketService";
+import { formatMYR, shortBookingRef, bookingRefFull } from "../../utils/format";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Pickup proximity threshold in meters (100m radius)
 const PICKUP_PROXIMITY_THRESHOLD_METERS = 200;
@@ -63,27 +71,29 @@ const calculateDistance = (
 };
 
 const STATUS_LABELS: Record<JobStatus, string> = {
-  ASSIGNED: 'Assigned',
-  EN_ROUTE: 'En route',
-  ARRIVED: 'Arrived',
-  PICKED_UP: 'Picked up',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
+  ASSIGNED: "Assigned",
+  EN_ROUTE: "En route",
+  ARRIVED: "Arrived",
+  PICKED_UP: "Picked up",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
 };
 
 const STATUS_TRANSITIONS: Partial<Record<JobStatus, JobStatus>> = {
-  ASSIGNED: 'EN_ROUTE',
-  EN_ROUTE: 'ARRIVED',
-  ARRIVED: 'PICKED_UP',
-  PICKED_UP: 'COMPLETED',
+  ASSIGNED: "EN_ROUTE",
+  EN_ROUTE: "ARRIVED",
+  ARRIVED: "PICKED_UP",
+  PICKED_UP: "COMPLETED",
 };
 
-const TERMINAL_STATUSES: JobStatus[] = ['COMPLETED', 'CANCELLED'];
-const ACTIVE_RIDE_STATUSES: JobStatus[] = ['EN_ROUTE', 'ARRIVED', 'PICKED_UP'];
+const TERMINAL_STATUSES: JobStatus[] = ["COMPLETED", "CANCELLED"];
+const ACTIVE_RIDE_STATUSES: JobStatus[] = ["EN_ROUTE", "ARRIVED", "PICKED_UP"];
 
-type CombinedStackParamList = ActiveJobsStackParamList & UpcomingJobsStackParamList & HistoryJobsStackParamList;
+type CombinedStackParamList = ActiveJobsStackParamList &
+  UpcomingJobsStackParamList &
+  HistoryJobsStackParamList;
 
-type Props = NativeStackScreenProps<CombinedStackParamList, 'JobDetails'>;
+type Props = NativeStackScreenProps<CombinedStackParamList, "JobDetails">;
 
 export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const { jobId } = route.params ?? {};
@@ -91,12 +101,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReason, setCancelReason] = useState("");
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [hasInProgressRide, setHasInProgressRide] = useState(false);
   const [inProgressRideId, setInProgressRideId] = useState<string | null>(null);
-  
+  const [pickupOtpModalVisible, setPickupOtpModalVisible] = useState(false);
+  const [pickupOtp, setPickupOtp] = useState("");
+
   // Use global location service
   const {
     permissionStatus,
@@ -116,7 +128,11 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       const hasDriverCoords = !!lastKnownCoordinates;
       const hasPickupCoords = !!job?.pickupCoords;
       if (!hasDriverCoords || !hasPickupCoords) {
-        return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+        return {
+          canVerify: false,
+          distanceMeters: null as number | null,
+          isNear: false,
+        };
       }
 
       const driverLat = Number(lastKnownCoordinates!.latitude);
@@ -130,12 +146,25 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         !Number.isFinite(pickupLat) ||
         !Number.isFinite(pickupLng)
       ) {
-        return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+        return {
+          canVerify: false,
+          distanceMeters: null as number | null,
+          isNear: false,
+        };
       }
 
-      const distance = calculateDistance(driverLat, driverLng, pickupLat, pickupLng);
+      const distance = calculateDistance(
+        driverLat,
+        driverLng,
+        pickupLat,
+        pickupLng
+      );
       if (!Number.isFinite(distance)) {
-        return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+        return {
+          canVerify: false,
+          distanceMeters: null as number | null,
+          isNear: false,
+        };
       }
 
       return {
@@ -144,49 +173,61 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         isNear: distance <= PICKUP_PROXIMITY_THRESHOLD_METERS,
       };
     } catch (error) {
-      console.warn('Error calculating pickup proximity:', error);
-      return { canVerify: false, distanceMeters: null as number | null, isNear: false };
+      console.warn("Error calculating pickup proximity:", error);
+      return {
+        canVerify: false,
+        distanceMeters: null as number | null,
+        isNear: false,
+      };
     }
   }, [lastKnownCoordinates, job?.pickupCoords]);
 
-  const isNearPickup = pickupProximity.canVerify ? pickupProximity.isNear : false;
+  const isNearPickup = pickupProximity.canVerify
+    ? pickupProximity.isNear
+    : false;
 
   // Check for in-progress rides (EN_ROUTE, ARRIVED, PICKED_UP)
   const checkForInProgressRides = useCallback(async () => {
     try {
-      const activeJobs = await getDriverJobs('ACTIVE');
+      const activeJobs = await getDriverJobs("ACTIVE");
       const inProgressJob = activeJobs.find(
-        (j: DriverJob) => ACTIVE_RIDE_STATUSES.includes(j.status) && j.id !== jobId
+        (j: DriverJob) =>
+          ACTIVE_RIDE_STATUSES.includes(j.status) && j.id !== jobId
       );
       setHasInProgressRide(!!inProgressJob);
       setInProgressRideId(inProgressJob?.id ?? null);
     } catch (error) {
-      console.warn('Failed to check for in-progress rides:', error);
+      console.warn("Failed to check for in-progress rides:", error);
     }
   }, [jobId]);
 
   // Notify admin and customer when driver arrives or is at pickup
-  const notifyArrival = useCallback(async (bookingId: string, type: 'arrived' | 'at_pickup') => {
-    // Send via WebSocket for real-time notification
-    socketService.safeSend({
-      event: 'driver:statusNotification',
-      data: {
+  const notifyArrival = useCallback(
+    async (bookingId: string, type: "arrived" | "at_pickup") => {
+      // Send via WebSocket for real-time notification
+      socketService.safeSend({
+        event: "driver:statusNotification",
+        data: {
+          bookingId,
+          notificationType: type,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      // Also send via REST API for persistence and push notifications
+      await notifyDriverArrival(
         bookingId,
-        notificationType: type,
-        timestamp: new Date().toISOString(),
-      },
-    });
-    
-    // Also send via REST API for persistence and push notifications
-    await notifyDriverArrival(
-      bookingId,
-      type,
-      lastKnownCoordinates ? {
-        latitude: lastKnownCoordinates.latitude,
-        longitude: lastKnownCoordinates.longitude,
-      } : undefined
-    );
-  }, [lastKnownCoordinates]);
+        type,
+        lastKnownCoordinates
+          ? {
+              latitude: lastKnownCoordinates.latitude,
+              longitude: lastKnownCoordinates.longitude,
+            }
+          : undefined
+      );
+    },
+    [lastKnownCoordinates]
+  );
 
   const fetchDetails = useCallback(async () => {
     if (!jobId) {
@@ -197,8 +238,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       const data = await getDriverJobDetails(jobId);
       setJob(data);
     } catch (error) {
-      const message = getErrorMessage(error, 'Unable to load job details');
-      showErrorToast('Job details', message);
+      const message = getErrorMessage(error, "Unable to load job details");
+      showErrorToast("Job details", message);
     } finally {
       setLoading(false);
     }
@@ -217,13 +258,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
     const needsHighFrequency = ACTIVE_RIDE_STATUSES.includes(job.status);
     const isTerminal = TERMINAL_STATUSES.includes(job.status);
-    
+
     if (needsHighFrequency) {
       setHighFrequencyMode(true);
     } else if (isTerminal) {
       setHighFrequencyMode(false);
     }
-    
+
     // Cleanup: disable high frequency when leaving this screen
     return () => {
       setHighFrequencyMode(false);
@@ -245,24 +286,29 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   }, [job?.id, job?.status, setActiveBookingId]);
 
   const performStatusUpdate = useCallback(
-    async (nextStatus: JobStatus, reason?: string) => {
+    async (nextStatus: JobStatus, reason?: string, otp?: string) => {
       if (!job) {
         return;
       }
 
       // Prevent En Route if another ride is in progress
-      if (nextStatus === 'EN_ROUTE' && hasInProgressRide) {
+      if (nextStatus === "EN_ROUTE" && hasInProgressRide) {
         Alert.alert(
-          'Ride In Progress',
-          'You have another ride in progress. Please complete or cancel that ride first.',
-          [{ text: 'OK' }]
+          "Ride In Progress",
+          "You have another ride in progress. Please complete or cancel that ride first.",
+          [{ text: "OK" }]
         );
         return;
       }
 
       setActionLoading(true);
       try {
-        const updatedJob = await updateDriverJobStatus(job.id, nextStatus, reason);
+        const updatedJob = await updateDriverJobStatus(
+          job.id,
+          nextStatus,
+          reason,
+          otp
+        );
         // Merge updated job with existing job data to preserve fields like coordinates
         // that may not be returned by the status update endpoint
         setJob((prevJob) => ({
@@ -275,28 +321,36 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           dropoff: updatedJob.dropoff ?? prevJob?.dropoff,
         }));
         emitJobRefresh();
-        showSuccessToast('Status updated', `Ride marked as ${STATUS_LABELS[nextStatus]}`);
+        showSuccessToast(
+          "Status updated",
+          `Ride marked as ${STATUS_LABELS[nextStatus]}`
+        );
 
         // Notify admin and customer when driver marks as arrived
-        if (nextStatus === 'ARRIVED') {
-          notifyArrival(job.id, 'arrived');
-          showInfoToast('Notification sent', 'Admin and customer have been notified of your arrival');
+        if (nextStatus === "ARRIVED") {
+          notifyArrival(job.id, "arrived");
+          showInfoToast(
+            "Notification sent",
+            "Admin and customer have been notified of your arrival"
+          );
         }
 
         // Show feedback prompt after completing a trip
-        if (nextStatus === 'COMPLETED') {
+        if (nextStatus === "COMPLETED") {
           setTimeout(() => setShowFeedbackPrompt(true), 1000);
         }
 
         // Refresh in-progress rides check
         checkForInProgressRides();
       } catch (error) {
-        const message = getErrorMessage(error, 'Failed to update status');
-        showErrorToast('Update failed', message);
+        const message = getErrorMessage(error, "Failed to update status");
+        showErrorToast("Update failed", message);
       } finally {
         setActionLoading(false);
         setCancelModalVisible(false);
-        setCancelReason('');
+        setCancelReason("");
+        setPickupOtpModalVisible(false);
+        setPickupOtp("");
       }
     },
     [job, hasInProgressRide, notifyArrival, checkForInProgressRides]
@@ -309,40 +363,42 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       }
 
       // Prevent En Route if another ride is in progress
-      if (nextStatus === 'EN_ROUTE' && hasInProgressRide) {
+      if (nextStatus === "EN_ROUTE" && hasInProgressRide) {
         Alert.alert(
-          'Ride In Progress',
-          'You have another ride in progress. Please complete or cancel that ride first.',
-          [{ text: 'OK' }]
+          "Ride In Progress",
+          "You have another ride in progress. Please complete or cancel that ride first.",
+          [{ text: "OK" }]
         );
         return;
       }
 
       // Validate proximity for marking as ARRIVED
-      if (nextStatus === 'ARRIVED') {
+      if (nextStatus === "ARRIVED") {
         if (pickupProximity.canVerify && !pickupProximity.isNear) {
           const distanceText =
-            typeof pickupProximity.distanceMeters === 'number'
-              ? ` (currently ~${Math.round(pickupProximity.distanceMeters)}m away)`
-              : '';
+            typeof pickupProximity.distanceMeters === "number"
+              ? ` (currently ~${Math.round(
+                  pickupProximity.distanceMeters
+                )}m away)`
+              : "";
           Alert.alert(
-            'Not at Pickup Location',
+            "Not at Pickup Location",
             `You need to be within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m of the pickup location to mark as arrived.${distanceText}`,
-            [{ text: 'OK' }]
+            [{ text: "OK" }]
           );
           return;
         }
 
         // If we cannot verify (missing pickup coords or location), allow with confirmation.
         if (!pickupProximity.canVerify) {
-          if (permissionStatus !== 'granted') {
+          if (permissionStatus !== "granted") {
             Alert.alert(
-              'Location Permission Needed',
-              'Enable location permission to verify you are at the pickup point.',
+              "Location Permission Needed",
+              "Enable location permission to verify you are at the pickup point.",
               [
-                { text: 'Not now', style: 'cancel' },
+                { text: "Not now", style: "cancel" },
                 {
-                  text: 'Enable',
+                  text: "Enable",
                   onPress: () => {
                     requestPermission().catch(() => undefined);
                   },
@@ -353,11 +409,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           }
 
           Alert.alert(
-            'Unable to Verify Proximity',
-            'Pickup coordinates or your current GPS location are unavailable. Do you want to mark as arrived anyway?',
+            "Unable to Verify Proximity",
+            "Pickup coordinates or your current GPS location are unavailable. Do you want to mark as arrived anyway?",
             [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Mark arrived', onPress: () => void performStatusUpdate(nextStatus, reason) },
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Mark arrived",
+                onPress: () => void performStatusUpdate(nextStatus, reason),
+              },
             ]
           );
           return;
@@ -366,7 +425,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
       await performStatusUpdate(nextStatus, reason);
     },
-    [job, hasInProgressRide, performStatusUpdate, pickupProximity, permissionStatus, requestPermission]
+    [
+      job,
+      hasInProgressRide,
+      performStatusUpdate,
+      pickupProximity,
+      permissionStatus,
+      requestPermission,
+    ]
   );
 
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
@@ -374,14 +440,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
   const getStatusColor = (status?: JobStatus) => {
     switch (status) {
-      case 'COMPLETED':
-        return '#2E7D32'; // green
-      case 'CANCELLED':
-        return '#C62828'; // red
-      case 'PICKED_UP':
-        return '#1565C0'; // blue
-      case 'ARRIVED':
-        return '#F9A825'; // amber
+      case "COMPLETED":
+        return "#2E7D32"; // green
+      case "CANCELLED":
+        return "#C62828"; // red
+      case "PICKED_UP":
+        return "#1565C0"; // blue
+      case "ARRIVED":
+        return "#F9A825"; // amber
       default:
         return colors.border;
     }
@@ -390,17 +456,19 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const confirmCashAndComplete = useCallback(() => {
     if (!job) return;
     Alert.alert(
-      'Confirm cash received',
-      'Have you received the cash payment from the passenger?',
+      "Confirm cash received",
+      "Have you received the cash payment from the passenger?",
       [
-        { text: 'No', style: 'cancel' },
+        { text: "No", style: "cancel" },
         {
-          text: 'Yes, received',
+          text: "Yes, received",
           onPress: async () => {
             // Use reason to indicate cash received; backend may record payment when completing
-            await performStatusUpdate('COMPLETED', 'CASH_PAID');
+            await performStatusUpdate("COMPLETED", "CASH_PAID");
             // Ensure UI reflects payment status
-            setJob((prev) => prev ? { ...prev, paymentStatus: 'PAID' } : prev);
+            setJob((prev) =>
+              prev ? { ...prev, paymentStatus: "PAID" } : prev
+            );
           },
         },
       ]
@@ -408,42 +476,48 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   }, [job, performStatusUpdate]);
 
   const handleCallPassenger = useCallback(() => {
-    if (!job || !job.passengerPhone || job.passengerPhone.trim() === '') {
-      Alert.alert('No phone number', 'Customer phone number is not available.');
+    if (!job || !job.passengerPhone || job.passengerPhone.trim() === "") {
+      Alert.alert("No phone number", "Customer phone number is not available.");
       return;
     }
     Linking.openURL(`tel:${job.passengerPhone}`).catch(() =>
-      Alert.alert('Dial failed', 'Unable to initiate a call on this device.')
+      Alert.alert("Dial failed", "Unable to initiate a call on this device.")
     );
   }, [job]);
 
   const handleWhatsApp = useCallback(() => {
-    if (!job || !job.passengerPhone || job.passengerPhone.trim() === '') {
-      Alert.alert('No phone number', 'Customer phone number is not available.');
+    if (!job || !job.passengerPhone || job.passengerPhone.trim() === "") {
+      Alert.alert("No phone number", "Customer phone number is not available.");
       return;
     }
-    const digits = job.passengerPhone.replace(/[^\d+]/g, '');
+    const digits = job.passengerPhone.replace(/[^\d+]/g, "");
     if (!digits) {
-      Alert.alert('Invalid phone number', 'Customer phone number is invalid.');
+      Alert.alert("Invalid phone number", "Customer phone number is invalid.");
       return;
     }
-    const url = `https://wa.me/${digits.replace('+', '')}`;
+    const url = `https://wa.me/${digits.replace("+", "")}`;
     Linking.openURL(url).catch(() =>
-      Alert.alert('WhatsApp unavailable', 'Install WhatsApp or try calling the customer instead.')
+      Alert.alert(
+        "WhatsApp unavailable",
+        "Install WhatsApp or try calling the customer instead."
+      )
     );
   }, [job]);
 
   const confirmCancellation = useCallback(() => {
     if (!cancelReason.trim()) {
-      Alert.alert('Reason required', 'Please provide a reason to cancel this ride.');
+      Alert.alert(
+        "Reason required",
+        "Please provide a reason to cancel this ride."
+      );
       return;
     }
-    handleStatusUpdate('CANCELLED', cancelReason.trim());
+    handleStatusUpdate("CANCELLED", cancelReason.trim());
   }, [cancelReason, handleStatusUpdate]);
 
   const formatDateTime = useCallback((value?: string) => {
     if (!value) {
-      return '—';
+      return "—";
     }
     return new Date(value).toLocaleString();
   }, []);
@@ -474,7 +548,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   if (!jobId) {
     return (
       <Screen contentContainerStyle={styles.loaderContainer}>
-        <Text style={styles.errorText}>Invalid job reference. Please go back and try again.</Text>
+        <Text style={styles.errorText}>
+          Invalid job reference. Please go back and try again.
+        </Text>
       </Screen>
     );
   }
@@ -487,11 +563,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     );
   }
 
-  const isAirportTransfer = job.rideType === 'AIRPORT_TRANSFER' || job.rideType === 'AIRPORT_RETURN_TRANSFER';
+  const isAirportTransfer =
+    job.rideType === "AIRPORT_TRANSFER" ||
+    job.rideType === "AIRPORT_RETURN_TRANSFER";
 
-  const pickupAddress = job.pickup?.addressLine ?? 'Pickup location pending';
-  const dropoffAddress = job.dropoff?.addressLine ?? 'Dropoff location pending';
-  const dropoffNote = job.dropoff?.landmark ?? '';
+  const pickupAddress = job.pickup?.addressLine ?? "Pickup location pending";
+  const dropoffAddress = job.dropoff?.addressLine ?? "Dropoff location pending";
+  const dropoffNote = job.dropoff?.landmark ?? "";
 
   // Active ride: Map at top with details panel below (non-overlapping)
   if (showMap) {
@@ -510,7 +588,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             fullScreen
             showDirections
             estimatedTime={estimatedTime}
-            estimatedDistance={job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined}
+            estimatedDistance={
+              job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined
+            }
           />
 
           {/* Close fullscreen button */}
@@ -523,24 +603,36 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
           {/* Navigate button overlay */}
           <View style={styles.fullscreenNavigateContainer}>
-            <Pressable 
-              style={styles.navigateOverlayButton} 
+            <Pressable
+              style={styles.navigateOverlayButton}
               onPress={() => {
-                const destination = job.status === 'PICKED_UP' && job.dropCoords 
-                  ? { lat: job.dropCoords.lat, lng: job.dropCoords.lng, label: 'Drop-off' }
-                  : job.pickupCoords 
-                    ? { lat: job.pickupCoords.lat, lng: job.pickupCoords.lng, label: 'Pickup' }
+                const destination =
+                  job.status === "PICKED_UP" && job.dropCoords
+                    ? {
+                        lat: job.dropCoords.lat,
+                        lng: job.dropCoords.lng,
+                        label: "Drop-off",
+                      }
+                    : job.pickupCoords
+                    ? {
+                        lat: job.pickupCoords.lat,
+                        lng: job.pickupCoords.lng,
+                        label: "Pickup",
+                      }
                     : null;
                 if (destination) {
                   const url = `google.navigation:q=${destination.lat},${destination.lng}`;
                   Linking.openURL(url).catch(() => {
-                    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`);
+                    Linking.openURL(
+                      `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`
+                    );
                   });
                 }
               }}
             >
               <Text style={styles.navigateOverlayButtonText}>
-                🧭 Navigate to {job.status === 'PICKED_UP' ? 'Drop-off' : 'Pickup'}
+                🧭 Navigate to{" "}
+                {job.status === "PICKED_UP" ? "Drop-off" : "Pickup"}
               </Text>
             </Pressable>
           </View>
@@ -562,7 +654,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             dropAddress={dropoffAddress}
             showDirections
             estimatedTime={estimatedTime}
-            estimatedDistance={job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined}
+            estimatedDistance={
+              job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined
+            }
           />
 
           {/* Maximize map button */}
@@ -575,66 +669,37 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         </View>
 
         {/* Details panel - scrollable below map */}
-        <ScrollView 
+        <ScrollView
           style={styles.detailsPanel}
           contentContainerStyle={styles.detailsPanelContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Navigate button */}
-          <Pressable 
-            style={styles.navigateOverlayButton} 
-            onPress={() => {
-              const destination = job.status === 'PICKED_UP' && job.dropCoords 
-                ? { lat: job.dropCoords.lat, lng: job.dropCoords.lng, label: 'Drop-off' }
-                : job.pickupCoords 
-                  ? { lat: job.pickupCoords.lat, lng: job.pickupCoords.lng, label: 'Pickup' }
-                  : null;
-              if (destination) {
-                const url = `google.navigation:q=${destination.lat},${destination.lng}`;
-                Linking.openURL(url).catch(() => {
-                  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`);
-                });
-              }
-            }}
-          >
-            <Text style={styles.navigateOverlayButtonText}>
-              🧭 Navigate to {job.status === 'PICKED_UP' ? 'Drop-off' : 'Pickup'}
-            </Text>
-          </Pressable>
-
-          {/* Status and ETA badge */}
-          <View style={styles.statusEtaRow}>
-            <View style={styles.overlayStatusBadge}>
-              <Text style={styles.overlayStatusText}>
-                {job.status === 'EN_ROUTE' && '🚗 Heading to pickup'}
-                {job.status === 'ARRIVED' && '📍 Waiting at pickup'}
-                {job.status === 'PICKED_UP' && '🛣️ En route to drop-off'}
-              </Text>
-            </View>
-            {(estimatedTime || job.distanceKm) && (
-              <View style={styles.etaBadge}>
-                {estimatedTime && <Text style={styles.etaText}>⏱ {estimatedTime}</Text>}
-                {job.distanceKm && <Text style={styles.etaText}>📍 {job.distanceKm.toFixed(1)} km</Text>}
-              </View>
-            )}
-          </View>
-
           {/* Customer info row */}
           <View style={styles.overlayCustomerRow}>
             <View style={styles.overlayCustomerInfo}>
-              <Text style={styles.overlayCustomerName}>{job.passengerName || 'Customer'}</Text>
-              {job.passengerPhone && job.passengerPhone.trim() !== '' && (
-                <Text style={styles.overlayCustomerPhone}>{job.passengerPhone}</Text>
+              <Text style={styles.overlayCustomerName}>
+                {job.passengerName || "Customer"}
+              </Text>
+              <Text style={styles.overlayCustomerPhone}>
+                Booking ID: {shortBookingRef(job.id)}
+              </Text>
+              {job.passengerPhone && job.passengerPhone.trim() !== "" && (
+                <Text style={styles.overlayCustomerPhone}>
+                  {job.passengerPhone}
+                </Text>
               )}
             </View>
             <View style={styles.customerActions}>
               <Pressable
                 style={[
                   styles.overlayCallButton,
-                  (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.overlayCallButtonDisabled
+                  (!job.passengerPhone || job.passengerPhone.trim() === "") &&
+                    styles.overlayCallButtonDisabled,
                 ]}
                 onPress={handleCallPassenger}
-                disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+                disabled={
+                  !job.passengerPhone || job.passengerPhone.trim() === ""
+                }
               >
                 <Text style={styles.overlayCallIcon}>📞</Text>
               </Pressable>
@@ -642,10 +707,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 style={[
                   styles.overlayCallButton,
                   styles.whatsappButton,
-                  (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.overlayCallButtonDisabled
+                  (!job.passengerPhone || job.passengerPhone.trim() === "") &&
+                    styles.overlayCallButtonDisabled,
                 ]}
                 onPress={handleWhatsApp}
-                disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+                disabled={
+                  !job.passengerPhone || job.passengerPhone.trim() === ""
+                }
               >
                 <Text style={styles.overlayCallIcon}>💬</Text>
               </Pressable>
@@ -667,7 +735,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               <View style={styles.locationDetailText}>
                 <Text style={styles.locationDetailLabel}>Drop-off</Text>
                 <Text style={styles.locationDetailValue}>{dropoffAddress}</Text>
-                {dropoffNote ? <Text style={styles.locationDetailNote}>{dropoffNote}</Text> : null}
+                {dropoffNote ? (
+                  <Text style={styles.locationDetailNote}>{dropoffNote}</Text>
+                ) : null}
               </View>
             </View>
           </View>
@@ -686,7 +756,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 <View style={[styles.locationDot, styles.dropDotStyle]} />
                 <View style={styles.locationDetailText}>
                   <Text style={styles.locationDetailLabel}>Flight ETA</Text>
-                  <Text style={styles.locationDetailValue}>{job.flightEta ? formatDateTime(job.flightEta) : '—'}</Text>
+                  <Text style={styles.locationDetailValue}>
+                    {job.flightEta ? formatDateTime(job.flightEta) : "—"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -697,34 +769,52 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <View style={styles.overlayPaymentItem}>
               <Text style={styles.overlayPaymentLabel}>Fare</Text>
               <Text style={styles.overlayPaymentValue}>
-                {job.paymentAmount != null && job.paymentAmount > 0 ? formatMYR(job.paymentAmount) : '—'}
+                {job.paymentAmount != null && job.paymentAmount > 0
+                  ? formatMYR(job.paymentAmount)
+                  : "—"}
               </Text>
             </View>
             <View style={styles.overlayPaymentItem}>
               <Text style={styles.overlayPaymentLabel}>Method</Text>
-              <Text style={styles.overlayPaymentValue}>{job.paymentMethod ?? '—'}</Text>
+              <Text style={styles.overlayPaymentValue}>
+                {job.paymentMethod ?? "—"}
+              </Text>
             </View>
             <View style={styles.overlayPaymentItem}>
               <Text style={styles.overlayPaymentLabel}>Status</Text>
-              <Text style={[
-                styles.overlayPaymentValue,
-                job.paymentStatus === 'PAID' && styles.overlayPaymentPaid
-              ]}>
-                {job.paymentStatus ?? '—'}
+              <Text
+                style={[
+                  styles.overlayPaymentValue,
+                  job.paymentStatus === "PAID" && styles.overlayPaymentPaid,
+                ]}
+              >
+                {job.paymentStatus ?? "—"}
               </Text>
             </View>
           </View>
 
           {/* Proximity indicator for ARRIVED status validation */}
-          {job.status === 'EN_ROUTE' && (
-            <View style={[styles.proximityIndicator, isNearPickup ? styles.proximityNear : styles.proximityFar]}>
+          {job.status === "EN_ROUTE" && (
+            <View
+              style={[
+                styles.proximityIndicator,
+                isNearPickup ? styles.proximityNear : styles.proximityFar,
+              ]}
+            >
               <Text style={styles.proximityText}>
-                {isNearPickup 
-                  ? `✓ You are at the pickup location${pickupProximity.canVerify && typeof pickupProximity.distanceMeters === 'number' ? ` (~${Math.round(pickupProximity.distanceMeters)}m)` : ''}`
-                  : pickupProximity.canVerify && typeof pickupProximity.distanceMeters === 'number'
-                    ? `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m) • ~${Math.round(pickupProximity.distanceMeters)}m away`
-                    : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`
-                }
+                {isNearPickup
+                  ? `✓ You are at the pickup location${
+                      pickupProximity.canVerify &&
+                      typeof pickupProximity.distanceMeters === "number"
+                        ? ` (~${Math.round(pickupProximity.distanceMeters)}m)`
+                        : ""
+                    }`
+                  : pickupProximity.canVerify &&
+                    typeof pickupProximity.distanceMeters === "number"
+                  ? `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m) • ~${Math.round(
+                      pickupProximity.distanceMeters
+                    )}m away`
+                  : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`}
               </Text>
             </View>
           )}
@@ -735,14 +825,20 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               <Pressable
                 style={[
                   styles.overlayPrimaryAction,
-                  (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear) &&
-                    styles.actionButtonDisabledStyle
+                  nextStatus === "ARRIVED" &&
+                    pickupProximity.canVerify &&
+                    !pickupProximity.isNear &&
+                    styles.actionButtonDisabledStyle,
                 ]}
                 onPress={() => {
+                  if (nextStatus === "PICKED_UP") {
+                    setPickupOtpModalVisible(true);
+                    return;
+                  }
                   if (
-                    nextStatus === 'COMPLETED' &&
-                    (job.paymentMethod ?? '').toUpperCase() === 'CASH' &&
-                    job.paymentStatus !== 'PAID'
+                    nextStatus === "COMPLETED" &&
+                    (job.paymentMethod ?? "").toUpperCase() === "CASH" &&
+                    job.paymentStatus !== "PAID"
                   ) {
                     confirmCashAndComplete();
                   } else {
@@ -751,7 +847,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 }}
                 disabled={
                   actionLoading ||
-                  (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear)
+                  (nextStatus === "ARRIVED" &&
+                    pickupProximity.canVerify &&
+                    !pickupProximity.isNear)
                 }
               >
                 {actionLoading ? (
@@ -760,16 +858,19 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   <Text
                     style={[
                       styles.overlayPrimaryActionLabel,
-                      (nextStatus === 'ARRIVED' && pickupProximity.canVerify && !pickupProximity.isNear) &&
+                      nextStatus === "ARRIVED" &&
+                        pickupProximity.canVerify &&
+                        !pickupProximity.isNear &&
                         styles.overlayPrimaryActionLabelDisabled,
                     ]}
                   >
-                    {nextStatus === 'ARRIVED' && 'Mark as Arrived'}
-                    {nextStatus === 'PICKED_UP' && 'Mark Pickup'}
-                    {nextStatus === 'COMPLETED' &&
-                      ((job.paymentMethod ?? '').toUpperCase() === 'CASH' && job.paymentStatus !== 'PAID'
-                        ? 'Confirm Cash Received'
-                        : 'Mark Completed')}
+                    {nextStatus === "ARRIVED" && "Mark as Arrived"}
+                    {nextStatus === "PICKED_UP" && "Mark Pickup"}
+                    {nextStatus === "COMPLETED" &&
+                      ((job.paymentMethod ?? "").toUpperCase() === "CASH" &&
+                      job.paymentStatus !== "PAID"
+                        ? "Confirm Cash Received"
+                        : "Mark Completed")}
                   </Text>
                 )}
               </Pressable>
@@ -783,12 +884,80 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           </View>
         </ScrollView>
 
+        {/* Pickup OTP Modal */}
+        <Modal
+          visible={pickupOtpModalVisible}
+          animationType="slide"
+          transparent
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.sectionTitle}>Enter Pickup OTP</Text>
+              <Text style={styles.subtle}>
+                Ask the customer for the OTP to start the ride.
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter OTP"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                value={pickupOtp}
+                onChangeText={(value) =>
+                  setPickupOtp(value.replace(/[^0-9]/g, ""))
+                }
+                maxLength={6}
+              />
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.modalSecondary}
+                  onPress={() => {
+                    setPickupOtpModalVisible(false);
+                    setPickupOtp("");
+                  }}
+                  disabled={actionLoading}
+                >
+                  <Text style={styles.secondaryActionLabel}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modalPrimary}
+                  onPress={() => {
+                    const normalizedOtp = pickupOtp.trim();
+                    if (normalizedOtp.length < 4) {
+                      Alert.alert(
+                        "Invalid OTP",
+                        "Please enter a valid OTP to start the ride."
+                      );
+                      return;
+                    }
+                    void performStatusUpdate(
+                      "PICKED_UP",
+                      undefined,
+                      normalizedOtp
+                    );
+                  }}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryActionLabel}>
+                      Verify & Start Ride
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* Cancel Modal */}
         <Modal visible={cancelModalVisible} animationType="slide" transparent>
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <Text style={styles.sectionTitle}>Cancel Ride</Text>
-              <Text style={styles.subtle}>Provide a reason so dispatch can notify the rider.</Text>
+              <Text style={styles.subtle}>
+                Provide a reason so dispatch can notify the rider.
+              </Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Reason for cancellation"
@@ -798,14 +967,23 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 onChangeText={setCancelReason}
               />
               <View style={styles.modalActions}>
-                <Pressable style={styles.modalSecondary} onPress={() => setCancelModalVisible(false)}>
+                <Pressable
+                  style={styles.modalSecondary}
+                  onPress={() => setCancelModalVisible(false)}
+                >
                   <Text style={styles.secondaryActionLabel}>Dismiss</Text>
                 </Pressable>
-                <Pressable style={styles.modalPrimary} onPress={confirmCancellation} disabled={actionLoading}>
+                <Pressable
+                  style={styles.modalPrimary}
+                  onPress={confirmCancellation}
+                  disabled={actionLoading}
+                >
                   {actionLoading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.primaryActionLabel}>Confirm cancel</Text>
+                    <Text style={styles.primaryActionLabel}>
+                      Confirm cancel
+                    </Text>
                   )}
                 </Pressable>
               </View>
@@ -835,10 +1013,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.jobId}>Ref: {shortBookingRef(job.id)}</Text>
-            <Text style={[styles.subtle, { marginTop: 6 }]}>Vehicle: {job.vehiclePlate ?? '—'}</Text>
+            <Text style={[styles.subtle, { marginTop: 6 }]}>
+              Vehicle: {job.vehiclePlate ?? "—"}
+            </Text>
           </View>
           <View style={styles.statusChip}>
-            <Text style={styles.statusChipText}>{STATUS_LABELS[job.status]}</Text>
+            <Text style={styles.statusChipText}>
+              {STATUS_LABELS[job.status]}
+            </Text>
           </View>
         </View>
 
@@ -849,10 +1031,12 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <View>
               <Text style={styles.locationLabel}>Pickup</Text>
               <Text style={styles.locationValue}>{pickupAddress}</Text>
-              <Text style={styles.subtle}>{formatDateTime(job.scheduledTime)}</Text>
+              <Text style={styles.subtle}>
+                {formatDateTime(job.scheduledTime)}
+              </Text>
             </View>
           </View>
-          <View style={[styles.locationRow, { marginTop: 16 }] }>
+          <View style={[styles.locationRow, { marginTop: 16 }]}>
             <View style={[styles.locationBullet, styles.dropBullet]} />
             <View>
               <Text style={styles.locationLabel}>Drop</Text>
@@ -864,58 +1048,79 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer</Text>
-          <Text style={styles.customerName}>{job.passengerName || 'Customer'}</Text>
-          {job.passengerPhone && job.passengerPhone.trim() !== '' ? (
+          <Text style={styles.customerName}>
+            {job.passengerName || "Customer"}
+          </Text>
+          {job.passengerPhone && job.passengerPhone.trim() !== "" ? (
             <Text style={styles.customerContact}>{job.passengerPhone}</Text>
           ) : (
-            <Text style={[styles.customerContact, { color: colors.muted }]}>Phone not available</Text>
+            <Text style={[styles.customerContact, { color: colors.muted }]}>
+              Phone not available
+            </Text>
           )}
           {job.passengerEmail ? (
             <Text style={styles.customerContact}>{job.passengerEmail}</Text>
           ) : null}
           <View style={styles.actionRow}>
-            <Pressable 
-              style={[
-                styles.actionButton, 
-                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionButtonDisabled
-              ]} 
-              onPress={handleCallPassenger}
-              disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
-            >
-              <Text style={[
-                styles.actionLabel,
-                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionLabelDisabled
-              ]}>Call</Text>
-            </Pressable>
-            <Pressable 
+            <Pressable
               style={[
                 styles.actionButton,
-                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionButtonDisabled
-              ]} 
-              onPress={handleWhatsApp}
-              disabled={!job.passengerPhone || job.passengerPhone.trim() === ''}
+                (!job.passengerPhone || job.passengerPhone.trim() === "") &&
+                  styles.actionButtonDisabled,
+              ]}
+              onPress={handleCallPassenger}
+              disabled={!job.passengerPhone || job.passengerPhone.trim() === ""}
             >
-              <Text style={[
-                styles.actionLabel,
-                (!job.passengerPhone || job.passengerPhone.trim() === '') && styles.actionLabelDisabled
-              ]}>WhatsApp</Text>
+              <Text
+                style={[
+                  styles.actionLabel,
+                  (!job.passengerPhone || job.passengerPhone.trim() === "") &&
+                    styles.actionLabelDisabled,
+                ]}
+              >
+                Call
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.actionButton,
+                (!job.passengerPhone || job.passengerPhone.trim() === "") &&
+                  styles.actionButtonDisabled,
+              ]}
+              onPress={handleWhatsApp}
+              disabled={!job.passengerPhone || job.passengerPhone.trim() === ""}
+            >
+              <Text
+                style={[
+                  styles.actionLabel,
+                  (!job.passengerPhone || job.passengerPhone.trim() === "") &&
+                    styles.actionLabelDisabled,
+                ]}
+              >
+                WhatsApp
+              </Text>
             </Pressable>
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ride Details</Text>
-          {(job.distanceKm !== undefined || job.durationMinutes !== undefined) && (
+          {(job.distanceKm !== undefined ||
+            job.durationMinutes !== undefined) && (
             <View style={styles.distanceTimeRow}>
               {job.distanceKm !== undefined && (
                 <View style={styles.distanceTimeItem}>
-                  <Text style={styles.distanceTimeValue}>{job.distanceKm.toFixed(1)} km</Text>
+                  <Text style={styles.distanceTimeValue}>
+                    {job.distanceKm.toFixed(1)} km
+                  </Text>
                   <Text style={styles.distanceTimeLabel}>Distance</Text>
                 </View>
               )}
               {job.durationMinutes !== undefined && (
                 <View style={styles.distanceTimeItem}>
-                  <Text style={styles.distanceTimeValue}>{job.durationMinutes} min</Text>
+                  <Text style={styles.distanceTimeValue}>
+                    {job.durationMinutes} min
+                  </Text>
                   <Text style={styles.distanceTimeLabel}>Est. Time</Text>
                 </View>
               )}
@@ -923,9 +1128,11 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           )}
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Estimated Fare</Text>
-            <Text style={styles.metaValue}>{
-              job.paymentAmount != null && job.paymentAmount > 0 ? formatMYR(job.paymentAmount) : '—'
-            }</Text>
+            <Text style={styles.metaValue}>
+              {job.paymentAmount != null && job.paymentAmount > 0
+                ? formatMYR(job.paymentAmount)
+                : "—"}
+            </Text>
           </View>
           {isAirportTransfer && job.flightNo ? (
             <>
@@ -935,89 +1142,118 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               </View>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Flight ETA</Text>
-                <Text style={styles.metaValue}>{job.flightEta ? formatDateTime(job.flightEta) : '—'}</Text>
+                <Text style={styles.metaValue}>
+                  {job.flightEta ? formatDateTime(job.flightEta) : "—"}
+                </Text>
               </View>
             </>
           ) : null}
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Payment Method</Text>
-            <Text style={styles.metaValue}>{job.paymentMethod ?? '—'}</Text>
+            <Text style={styles.metaValue}>{job.paymentMethod ?? "—"}</Text>
           </View>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Payment Status</Text>
-            <Text style={styles.metaValue}>{job.paymentStatus ?? '—'}</Text>
+            <Text style={styles.metaValue}>{job.paymentStatus ?? "—"}</Text>
           </View>
           {job.notes ? <Text style={styles.notes}>{job.notes}</Text> : null}
           {isSharingLocation && ACTIVE_RIDE_STATUSES.includes(job.status) && (
             <Text style={styles.trackingBadge}>
-              Sharing live location with dispatch{isHighFrequencyMode ? ' (high frequency)' : ''}…
+              Sharing live location with dispatch
+              {isHighFrequencyMode ? " (high frequency)" : ""}…
             </Text>
           )}
         </View>
 
-          {!isJobTerminal && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Status Timeline</Text>
-              {timelineItems.map((item) => {
-                const isActive = item.status === job.status;
-                return (
-                  <View key={`${item.status}-${item.timestamp}`} style={styles.timelineRow}>
-                    <View style={[styles.timelineIndicator, isActive && styles.timelineIndicatorActive]} />
-                    <View>
-                      <Text style={[styles.timelineStatus, isActive && styles.timelineStatusActive]}>
-                        {STATUS_LABELS[item.status]}
-                      </Text>
-                      <Text style={styles.subtle}>{formatDateTime(item.timestamp)}</Text>
-                    </View>
+        {!isJobTerminal && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Status Timeline</Text>
+            {timelineItems.map((item) => {
+              const isActive = item.status === job.status;
+              return (
+                <View
+                  key={`${item.status}-${item.timestamp}`}
+                  style={styles.timelineRow}
+                >
+                  <View
+                    style={[
+                      styles.timelineIndicator,
+                      isActive && styles.timelineIndicatorActive,
+                    ]}
+                  />
+                  <View>
+                    <Text
+                      style={[
+                        styles.timelineStatus,
+                        isActive && styles.timelineStatusActive,
+                      ]}
+                    >
+                      {STATUS_LABELS[item.status]}
+                    </Text>
+                    <Text style={styles.subtle}>
+                      {formatDateTime(item.timestamp)}
+                    </Text>
                   </View>
-                );
-              })}
-            </View>
-          )}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {!isJobTerminal && (
           <View style={styles.section}>
             {/* Warning for in-progress ride */}
-            {hasInProgressRide && nextStatus === 'EN_ROUTE' && (
+            {hasInProgressRide && nextStatus === "EN_ROUTE" && (
               <View style={styles.inProgressWarning}>
                 <Text style={styles.inProgressWarningText}>
-                  ⚠️ You have another ride in progress. Complete or cancel that ride first.
+                  ⚠️ You have another ride in progress. Complete or cancel that
+                  ride first.
                 </Text>
               </View>
             )}
-            
+
             {nextStatus && (
-              <Pressable 
+              <Pressable
                 style={[
                   styles.primaryAction,
-                  (hasInProgressRide && nextStatus === 'EN_ROUTE') && styles.primaryActionDisabled
-                ]} 
+                  hasInProgressRide &&
+                    nextStatus === "EN_ROUTE" &&
+                    styles.primaryActionDisabled,
+                ]}
                 onPress={() => {
                   if (
-                    nextStatus === 'COMPLETED' &&
-                    (job.paymentMethod ?? '').toUpperCase() === 'CASH' &&
-                    job.paymentStatus !== 'PAID'
+                    nextStatus === "COMPLETED" &&
+                    (job.paymentMethod ?? "").toUpperCase() === "CASH" &&
+                    job.paymentStatus !== "PAID"
                   ) {
                     confirmCashAndComplete();
                   } else {
                     handleStatusUpdate(nextStatus);
                   }
                 }}
-                disabled={actionLoading || (hasInProgressRide && nextStatus === 'EN_ROUTE')}
+                disabled={
+                  actionLoading ||
+                  (hasInProgressRide && nextStatus === "EN_ROUTE")
+                }
               >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.primaryActionLabel}>{
-                    nextStatus === 'COMPLETED' && (job.paymentMethod ?? '').toUpperCase() === 'CASH' && job.paymentStatus !== 'PAID'
-                      ? 'Confirm Cash Received'
-                      : `Mark as ${STATUS_LABELS[nextStatus]}`
-                  }</Text>
+                  <Text style={styles.primaryActionLabel}>
+                    {nextStatus === "COMPLETED" &&
+                    (job.paymentMethod ?? "").toUpperCase() === "CASH" &&
+                    job.paymentStatus !== "PAID"
+                      ? "Confirm Cash Received"
+                      : `Mark as ${STATUS_LABELS[nextStatus]}`}
+                  </Text>
                 )}
               </Pressable>
             )}
 
-            <Pressable style={styles.secondaryAction} onPress={() => setCancelModalVisible(true)}>
+            <Pressable
+              style={styles.secondaryAction}
+              onPress={() => setCancelModalVisible(true)}
+            >
               <Text style={styles.secondaryActionLabel}>Cancel ride</Text>
             </Pressable>
           </View>
@@ -1028,7 +1264,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.sectionTitle}>Cancel Ride</Text>
-            <Text style={styles.subtle}>Provide a reason so dispatch can notify the rider.</Text>
+            <Text style={styles.subtle}>
+              Provide a reason so dispatch can notify the rider.
+            </Text>
             <TextInput
               style={styles.modalInput}
               placeholder="Reason for cancellation"
@@ -1038,10 +1276,17 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               onChangeText={setCancelReason}
             />
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalSecondary} onPress={() => setCancelModalVisible(false)}>
+              <Pressable
+                style={styles.modalSecondary}
+                onPress={() => setCancelModalVisible(false)}
+              >
                 <Text style={styles.secondaryActionLabel}>Dismiss</Text>
               </Pressable>
-              <Pressable style={styles.modalPrimary} onPress={confirmCancellation} disabled={actionLoading}>
+              <Pressable
+                style={styles.modalPrimary}
+                onPress={confirmCancellation}
+                disabled={actionLoading}
+              >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -1075,11 +1320,11 @@ const styles = StyleSheet.create({
   },
   mapSection: {
     height: SCREEN_HEIGHT * 0.35,
-    position: 'relative',
+    position: "relative",
   },
   detailsPanel: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: -16,
@@ -1089,16 +1334,16 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   maximizeMapButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     right: 12,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: "rgba(255,255,255,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -1109,35 +1354,35 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   closeFullscreenButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 40,
     right: 16,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   closeFullscreenButtonText: {
     fontSize: 24,
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
   },
   fullscreenNavigateContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 40,
     left: 16,
     right: 16,
   },
   statusEtaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   etaBadge: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   etaText: {
@@ -1151,11 +1396,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   customerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   whatsappButton: {
-    backgroundColor: '#25D366',
+    backgroundColor: "#25D366",
   },
   locationDetailsCard: {
     backgroundColor: colors.background,
@@ -1164,8 +1409,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   locationDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
   },
   locationDot: {
@@ -1195,7 +1440,7 @@ const styles = StyleSheet.create({
   locationDetailNote: {
     fontSize: typography.caption,
     color: colors.muted,
-    fontStyle: 'italic',
+    fontStyle: "italic",
     marginTop: 2,
   },
   locationConnector: {
@@ -1211,14 +1456,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   proximityNear: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: "#E8F5E9",
   },
   proximityFar: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: "#FFF3E0",
   },
   proximityText: {
     fontSize: typography.caption,
-    textAlign: 'center',
+    textAlign: "center",
     color: colors.text,
   },
   actionButtonDisabledStyle: {
@@ -1226,16 +1471,16 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   bottomOverlay: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 16,
     paddingBottom: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1246,11 +1491,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 12,
   },
   navigateOverlayButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -1260,7 +1505,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 12,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   overlayStatusText: {
     fontSize: typography.caption,
@@ -1268,9 +1513,9 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyMedium,
   },
   overlayCustomerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
@@ -1289,8 +1534,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginLeft: 12,
   },
   overlayCallButtonDisabled: {
@@ -1301,13 +1546,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   overlayPaymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 16,
     paddingVertical: 8,
   },
   overlayPaymentItem: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
   },
   overlayPaymentLabel: {
@@ -1324,7 +1569,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   overlayActionsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   overlayPrimaryAction: {
@@ -1332,11 +1577,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   overlayPrimaryActionLabel: {
-    color: '#fff',
+    color: "#fff",
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -1349,8 +1594,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.danger,
     paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   overlayCancelActionLabel: {
     color: colors.danger,
@@ -1359,8 +1604,8 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   errorText: {
     fontSize: typography.body,
@@ -1373,9 +1618,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     minHeight: 48,
   },
   jobId: {
@@ -1395,11 +1640,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   statusChipText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: typography.caption,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
@@ -1412,9 +1657,9 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   locationRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
   locationBullet: {
     width: 10,
@@ -1445,7 +1690,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   actionRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 12,
   },
@@ -1455,8 +1700,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionButtonDisabled: {
     borderColor: colors.border,
@@ -1471,20 +1716,20 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   distanceTimeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginBottom: 16,
     paddingVertical: 12,
     backgroundColor: colors.background,
     borderRadius: 12,
   },
   distanceTimeItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   distanceTimeValue: {
     fontSize: typography.heading,
@@ -1516,7 +1761,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   timelineRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 12,
   },
@@ -1542,7 +1787,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 16,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 12,
   },
   primaryActionDisabled: {
@@ -1550,25 +1795,25 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   primaryActionLabel: {
-    color: '#fff',
+    color: "#fff",
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
   inProgressWarning: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: "#FFF3E0",
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#FFB74D',
+    borderColor: "#FFB74D",
   },
   inProgressWarningText: {
     fontSize: typography.caption,
-    color: '#E65100',
-    textAlign: 'center',
+    color: "#E65100",
+    textAlign: "center",
   },
   secondaryAction: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
   secondaryActionLabel: {
@@ -1578,12 +1823,12 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
     padding: 24,
   },
   modalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
   },
@@ -1594,11 +1839,11 @@ const styles = StyleSheet.create({
     minHeight: 100,
     padding: 12,
     marginTop: 16,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   modalActions: {
     marginTop: 16,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   modalSecondary: {
@@ -1606,14 +1851,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
   modalPrimary: {
     flex: 1,
     borderRadius: 12,
     backgroundColor: colors.primary,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
 });

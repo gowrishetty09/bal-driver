@@ -189,10 +189,13 @@ export const getDriverJobDetails = async (jobId: string): Promise<DriverJobDetai
 export const updateDriverJobStatus = async (
     jobId: string,
     status: JobStatus,
-    reason?: string
+    reason?: string,
+    otp?: string
 ): Promise<DriverJobDetail> => {
     try {
-        const payload = reason ? { status, reason } : { status };
+        const payload: Record<string, unknown> = { status };
+        if (reason) payload.reason = reason;
+        if (otp) payload.otp = otp;
         const { data } = await apiClient.patch<DriverJobDetail>(`/driver/jobs/${jobId}/status`, payload);
         return data;
     } catch (error) {
