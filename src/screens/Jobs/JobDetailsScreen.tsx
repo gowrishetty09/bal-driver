@@ -118,7 +118,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
   const canSubmitPickupCode = useMemo(() => {
     const normalized = pickupCode.trim();
-    return normalized.length === PICKUP_CODE_LENGTH;
+    return /^\d{6}$/.test(normalized);
   }, [pickupCode]);
 
   // Use global location service
@@ -984,9 +984,12 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 placeholderTextColor={colors.muted}
                 keyboardType="number-pad"
                 value={pickupCode}
-                onChangeText={(value) =>
-                  setPickupCode(value.replace(/[^0-9]/g, ""))
-                }
+                onChangeText={(value) => {
+                  const digitsOnly = value
+                    .replace(/[^0-9]/g, "")
+                    .slice(0, PICKUP_CODE_LENGTH);
+                  setPickupCode(digitsOnly);
+                }}
                 maxLength={PICKUP_CODE_LENGTH}
                 editable={!actionLoading && !awaitingRideStartConfirmation}
               />
@@ -1011,7 +1014,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     if (awaitingRideStartConfirmation) return;
 
                     const normalizedCode = pickupCode.trim();
-                    if (normalizedCode.length !== PICKUP_CODE_LENGTH) {
+                    if (!/^\d{6}$/.test(normalizedCode)) {
                       Alert.alert(
                         "Invalid code",
                         `Please enter the ${PICKUP_CODE_LENGTH}-digit pickup code to start the ride.`
