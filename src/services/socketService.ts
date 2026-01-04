@@ -1,3 +1,5 @@
+import { WS_URL } from '../utils/config';
+
 class SocketService {
 	private ws: WebSocket | null = null;
 	private driverId: string | null = null;
@@ -8,7 +10,7 @@ class SocketService {
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
-	private readonly WS_URL = 'wss://bestaerolimo.online/ws';
+	private readonly WS_URL = WS_URL;
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Background Location Batching (Battery Saver)
@@ -74,7 +76,7 @@ class SocketService {
 		this.ws.onopen = () => {
 			this.connected = true;
 			this.reconnectAttempts = 0;
-			console.log('[Socket] Connected');
+			console.log('[Socket] Connected:', this.WS_URL);
 			this.safeSend({ event: 'driver:join', data: { driverId: this.driverId! } });
 			this.emit('connect');
 		};
@@ -98,14 +100,25 @@ class SocketService {
 			}
 		};
 
-		this.ws.onerror = () => {
-			// Some platforms only surface errors via onclose; keep this minimal.
-			this.emit('error');
+		this.ws.onerror = (event: any) => {
+			// Many RN/Expo platforms provide limited detail; still log what we can.
+			const message = event?.message ?? event?.type ?? event;
+			console.log('[Socket] Error:', message);
+			this.emit('error', message);
 		};
 
-		this.ws.onclose = () => {
+		this.ws.onclose = (event: any) => {
 			this.connected = false;
 			this.ws = null;
+			if (event) {
+				console.log('[Socket] Closed:', {
+					code: event.code,
+					reason: event.reason,
+					wasClean: event.wasClean,
+				});
+			} else {
+				console.log('[Socket] Closed');
+			}
 			this.emit('disconnect');
 			if (this.shouldReconnect) {
 				this.scheduleReconnect();

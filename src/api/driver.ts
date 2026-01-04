@@ -279,14 +279,13 @@ export const verifyPickupCode = async (bookingId: string, code: string): Promise
  */
 export const notifyDriverArrival = async (
     jobId: string,
-    notificationType: 'arrived' | 'at_pickup' | 'en_route' | 'picked_up',
+    type: 'arrived' | 'at_pickup' | 'en_route' | 'picked_up',
     coordinates?: { latitude: number; longitude: number }
 ): Promise<void> => {
     try {
         await apiClient.post(`/driver/jobs/${jobId}/notify`, {
-            notificationType,
+            type,
             coordinates,
-            timestamp: new Date().toISOString(),
         });
     } catch (error) {
         if (!shouldUseMocks()) {

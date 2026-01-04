@@ -257,6 +257,53 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     }
   }, [jobId]);
 
+  // Fallback: if socket confirmation doesn't arrive, refresh once and unblock UI.
+  useEffect(() => {
+    if (!awaitingRideStartConfirmation || !jobId) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void (async () => {
+        try {
+          const updated = await getDriverJobDetails(jobId);
+          setJob(updated);
+
+          if (updated.status === "PICKED_UP") {
+            setAwaitingRideStartConfirmation(false);
+            setPickupCodeModalVisible(false);
+            setPickupCode("");
+            emitJobRefresh();
+            showSuccessToast("Ride started", "Pickup confirmed.");
+
+            rootNavigation.navigate("ActiveJobsTab", {
+              screen: "JobDetails",
+              params: { jobId },
+            });
+            return;
+          }
+
+          setAwaitingRideStartConfirmation(false);
+          showErrorToast(
+            "Ride start",
+            "No confirmation received. Please try again."
+          );
+        } catch (error) {
+          setAwaitingRideStartConfirmation(false);
+          const message = getErrorMessage(
+            error,
+            "Failed to refresh ride status"
+          );
+          showErrorToast("Ride start", message);
+        }
+      })();
+    }, 8000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [awaitingRideStartConfirmation, jobId, rootNavigation]);
+
   // Join booking room for realtime events and gate ride-start UI on socket confirmation.
   useEffect(() => {
     if (!job?.id) {
@@ -1038,6 +1085,31 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                             "Pickup code verified",
                             "Waiting for ride start confirmation…"
                           );
+
+                          // Also refresh once immediately in case the socket event is missed.
+                          void (async () => {
+                            try {
+                              const updated = await getDriverJobDetails(job.id);
+                              setJob(updated);
+                              if (updated.status === "PICKED_UP") {
+                                setAwaitingRideStartConfirmation(false);
+                                setPickupCodeModalVisible(false);
+                                setPickupCode("");
+                                emitJobRefresh();
+                                showSuccessToast(
+                                  "Ride started",
+                                  "Pickup confirmed."
+                                );
+
+                                rootNavigation.navigate("ActiveJobsTab", {
+                                  screen: "JobDetails",
+                                  params: { jobId: job.id },
+                                });
+                              }
+                            } catch {
+                              // Ignore; timeout fallback will handle.
+                            }
+                          })();
                           return;
                         }
 
