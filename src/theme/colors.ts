@@ -13,5 +13,6 @@ export const colors = {
     pagenavy: 'rgba(21, 30, 45, 1)',
     pagegold: 'rgba(189, 146, 80, 1)',
     textgold: 'rgb(255, 213, 5)',
+    cardbgtransparent: 'rgba(255, 255, 255, 0.1)',
 
 };

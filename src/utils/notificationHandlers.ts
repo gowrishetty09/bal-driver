@@ -81,7 +81,7 @@ export const getNotificationType = (data?: Record<string, string | number | bool
  */
 export const handleNotificationPress = (data?: Record<string, string | number | boolean>) => {
     if (!data) {
-        return { screen: 'ActiveJobsTab' };
+        return { screen: 'RidesTab' };
     }
 
     const notificationType = getNotificationType(data);
@@ -94,19 +94,21 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
         case 'ADMIN_REASSIGNMENT':
             // Navigate to active jobs with specific job details
             return {
-                screen: 'ActiveJobsTab',
-                params: {
-                    jobId: jobId,
-                    openDetails: true,
-                },
+                screen: 'RidesTab',
+                params: jobId
+                    ? {
+                        screen: 'JobDetails',
+                        params: { jobId },
+                    }
+                    : undefined,
             };
         case 'SOS_MESSAGE':
-            // For SOS, navigate to active jobs (driver is already there)
+            // For SOS, land on rides (driver is already there)
             return {
-                screen: 'ActiveJobsTab',
+                screen: 'RidesTab',
             };
         default:
-            return { screen: 'ActiveJobsTab' };
+            return { screen: 'RidesTab' };
     }
 };
 

@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
   },
   card: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.cardbgtransparent,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,

@@ -22,9 +22,7 @@ import { useLocationService } from "../../hooks/useLocationService";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import {
-  ActiveJobsStackParamList,
-  HistoryJobsStackParamList,
-  UpcomingJobsStackParamList,
+  RidesStackParamList,
 } from "../../types/navigation";
 import {
   DriverJob,
@@ -93,11 +91,7 @@ const STATUS_TRANSITIONS: Partial<Record<JobStatus, JobStatus>> = {
 const TERMINAL_STATUSES: JobStatus[] = ["COMPLETED", "CANCELLED"];
 const ACTIVE_RIDE_STATUSES: JobStatus[] = ["EN_ROUTE", "ARRIVED", "PICKED_UP"];
 
-type CombinedStackParamList = ActiveJobsStackParamList &
-  UpcomingJobsStackParamList &
-  HistoryJobsStackParamList;
-
-type Props = NativeStackScreenProps<CombinedStackParamList, "JobDetails">;
+type Props = NativeStackScreenProps<RidesStackParamList, "JobDetails">;
 
 export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const { jobId } = route.params ?? {};
@@ -276,7 +270,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             emitJobRefresh();
             showSuccessToast("Ride started", "Pickup confirmed.");
 
-            rootNavigation.navigate("ActiveJobsTab", {
+            rootNavigation.navigate("RidesTab", {
               screen: "JobDetails",
               params: { jobId },
             });
@@ -342,7 +336,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       showSuccessToast("Ride started", "Pickup confirmed.");
 
       // Ensure the driver lands in Active tab after ride is started.
-      rootNavigation.navigate("ActiveJobsTab", {
+      rootNavigation.navigate("RidesTab", {
         screen: "JobDetails",
         params: { jobId: job.id },
       });
@@ -1101,7 +1095,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                                   "Pickup confirmed."
                                 );
 
-                                rootNavigation.navigate("ActiveJobsTab", {
+                                rootNavigation.navigate("RidesTab", {
                                   screen: "JobDetails",
                                   params: { jobId: job.id },
                                 });
@@ -1222,7 +1216,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.jobId}>Ref: {shortBookingRef(job.id)}</Text>
+            <Text style={styles.jobId}>{shortBookingRef(job.id)}</Text>
             <Text style={[styles.subtle, { marginTop: 6 }]}>
               Vehicle: {job.vehiclePlate ?? "—"}
             </Text>
@@ -1534,7 +1528,7 @@ const styles = StyleSheet.create({
   },
   detailsPanel: {
     flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.cardbgtransparent,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: -16,
@@ -1685,7 +1679,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.cardbgtransparent,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 16,
@@ -1854,7 +1848,7 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
   section: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.cardbgtransparent,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,

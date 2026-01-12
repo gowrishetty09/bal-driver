@@ -71,13 +71,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    backgroundColor: '#af6600',
   },
   warning: {
-    backgroundColor: '#FFF4E5',
+    backgroundColor: colors.cardbgtransparent,
     borderColor: '#FDD49A',
   },
   paused: {
-    backgroundColor: '#E8F0FF',
+    backgroundColor: colors.cardbgtransparent,
     borderColor: colors.primary,
   },
   textBlock: {

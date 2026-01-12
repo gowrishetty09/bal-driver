@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
   card: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.cardbgtransparent,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,

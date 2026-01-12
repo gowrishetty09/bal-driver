@@ -14,9 +14,8 @@ import { LoginScreen } from "../screens/Auth/LoginScreen";
 import { ForgotPasswordEmailScreen } from "../screens/Auth/ForgotPasswordEmailScreen";
 import { ForgotPasswordOtpScreen } from "../screens/Auth/ForgotPasswordOtpScreen";
 import { ForgotPasswordResetScreen } from "../screens/Auth/ForgotPasswordResetScreen";
-import { ActiveJobsScreen } from "../screens/Jobs/ActiveJobsScreen";
-import { UpcomingJobsScreen } from "../screens/Jobs/UpcomingJobsScreen";
-import { HistoryJobsScreen } from "../screens/Jobs/HistoryJobsScreen";
+import { HomeDashboardScreen } from "../screens/Home/HomeDashboardScreen";
+import { RidesScreen } from "../screens/Jobs/RidesScreen";
 import { JobDetailsScreen } from "../screens/Jobs/JobDetailsScreen";
 import { AddExpenseScreen } from "../screens/Expenses/ExpensesScreen";
 import { ExpensesListScreen } from "../screens/Expenses/ExpensesListScreen";
@@ -28,23 +27,21 @@ import { FeedbackScreen } from "../screens/Feedback/FeedbackScreen";
 import { useAuth } from "../hooks/useAuth";
 import { useNotificationContext } from "../context/NotificationContext";
 import {
-  ActiveJobsStackParamList,
   AuthStackParamList,
   FeedbackStackParamList,
-  HistoryJobsStackParamList,
   ExpensesStackParamList,
+  HomeStackParamList,
   MainTabParamList,
   ProfileStackParamList,
+  RidesStackParamList,
   SupportStackParamList,
-  UpcomingJobsStackParamList,
 } from "../types/navigation";
 
 enableScreens();
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const ActiveStack = createNativeStackNavigator<ActiveJobsStackParamList>();
-const UpcomingStack = createNativeStackNavigator<UpcomingJobsStackParamList>();
-const HistoryStack = createNativeStackNavigator<HistoryJobsStackParamList>();
+const HomeStack = createNativeStackNavigator<HomeStackParamList>();
+const RidesStack = createNativeStackNavigator<RidesStackParamList>();
 const ExpensesStack = createNativeStackNavigator<ExpensesStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const SupportStack = createNativeStackNavigator<SupportStackParamList>();
@@ -64,8 +61,8 @@ const HeaderLogo = () => (
 const HeaderSignOutButton: React.FC<{ onPress: () => void }> = ({
   onPress,
 }) => (
-  <Pressable onPress={onPress} hitSlop={8}>
-    <Text style={styles.headerAction}>Sign out</Text>
+  <Pressable onPress={onPress} hitSlop={8} style={styles.headerIconButton}>
+    <Ionicons name="log-out-outline" size={20} color={colors.brandGold} />
   </Pressable>
 );
 
@@ -102,69 +99,42 @@ const AuthStackNavigator = () => (
   </AuthStack.Navigator>
 );
 
-const ActiveJobsStackNavigator = () => {
+const HomeStackNavigator = () => {
   const { logout } = useAuth();
 
   return (
-    <ActiveStack.Navigator screenOptions={stackScreenOptions}>
-      <ActiveStack.Screen
-        name="ActiveJobs"
-        component={ActiveJobsScreen}
+    <HomeStack.Navigator screenOptions={stackScreenOptions}>
+      <HomeStack.Screen
+        name="HomeDashboard"
+        component={HomeDashboardScreen}
         options={{
-          title: "Active Jobs",
+          title: "Home",
           headerRight: () => <HeaderActions onLogout={logout} />,
         }}
       />
-      <ActiveStack.Screen
-        name="JobDetails"
-        component={JobDetailsScreen}
-        options={{ title: "Job Details" }}
-      />
-    </ActiveStack.Navigator>
+    </HomeStack.Navigator>
   );
 };
 
-const UpcomingJobsStackNavigator = () => {
+const RidesStackNavigator = () => {
   const { logout } = useAuth();
 
   return (
-    <UpcomingStack.Navigator screenOptions={stackScreenOptions}>
-      <UpcomingStack.Screen
-        name="UpcomingJobs"
-        component={UpcomingJobsScreen}
+    <RidesStack.Navigator screenOptions={stackScreenOptions}>
+      <RidesStack.Screen
+        name="Rides"
+        component={RidesScreen}
         options={{
-          title: "Upcoming Jobs",
+          title: "Rides",
           headerRight: () => <HeaderActions onLogout={logout} />,
         }}
       />
-      <UpcomingStack.Screen
+      <RidesStack.Screen
         name="JobDetails"
         component={JobDetailsScreen}
         options={{ title: "Job Details" }}
       />
-    </UpcomingStack.Navigator>
-  );
-};
-
-const HistoryJobsStackNavigator = () => {
-  const { logout } = useAuth();
-
-  return (
-    <HistoryStack.Navigator screenOptions={stackScreenOptions}>
-      <HistoryStack.Screen
-        name="HistoryJobs"
-        component={HistoryJobsScreen}
-        options={{
-          title: "Rides History",
-          headerRight: () => <HeaderActions onLogout={logout} />,
-        }}
-      />
-      <HistoryStack.Screen
-        name="JobDetails"
-        component={JobDetailsScreen}
-        options={{ title: "Job Details" }}
-      />
-    </HistoryStack.Navigator>
+    </RidesStack.Navigator>
   );
 };
 
@@ -262,9 +232,8 @@ const SupportStackNavigator = () => {
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const tabIcons: Record<keyof MainTabParamList, IconName> = {
-  ActiveJobsTab: "car-sport-outline",
-  UpcomingJobsTab: "calendar-outline",
-  HistoryJobsTab: "time-outline",
+  HomeTab: "home-outline",
+  RidesTab: "car-sport-outline",
   ExpensesTab: "cash-outline",
   SupportTab: "help-buoy-outline",
   ProfileTab: "person-circle-outline",
@@ -286,19 +255,14 @@ const MainTabsNavigator = () => (
     })}
   >
     <Tabs.Screen
-      name="ActiveJobsTab"
-      component={ActiveJobsStackNavigator}
-      options={{ title: "Active" }}
+      name="HomeTab"
+      component={HomeStackNavigator}
+      options={{ title: "Home" }}
     />
     <Tabs.Screen
-      name="UpcomingJobsTab"
-      component={UpcomingJobsStackNavigator}
-      options={{ title: "Upcoming" }}
-    />
-    <Tabs.Screen
-      name="HistoryJobsTab"
-      component={HistoryJobsStackNavigator}
-      options={{ title: "History" }}
+      name="RidesTab"
+      component={RidesStackNavigator}
+      options={{ title: "Rides" }}
     />
     <Tabs.Screen
       name="ExpensesTab"
@@ -366,9 +330,13 @@ const styles = StyleSheet.create({
     width: 180,
     resizeMode: "contain",
   },
-  headerAction: {
-    color: colors.brandGold,
-    fontWeight: "600",
+  headerIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.15)",
   },
   headerActions: {
     flexDirection: "row",

@@ -24,10 +24,18 @@ export type HistoryJobsStackParamList = {
     JobDetails: JobDetailsParams;
 };
 
+export type HomeStackParamList = {
+    HomeDashboard: undefined;
+};
+
+export type RidesStackParamList = {
+    Rides: { initialType?: 'ACTIVE' | 'UPCOMING' | 'HISTORY' } | undefined;
+    JobDetails: JobDetailsParams;
+};
+
 export type MainTabParamList = {
-    ActiveJobsTab: undefined;
-    UpcomingJobsTab: undefined;
-    HistoryJobsTab: undefined;
+    HomeTab: undefined;
+    RidesTab: undefined;
     ExpensesTab: undefined;
     SupportTab: undefined;
     ProfileTab: undefined;
