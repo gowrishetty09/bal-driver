@@ -1,9 +1,9 @@
-import React from 'react';
-import { ScrollView, StyleProp, StyleSheet, ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import React from "react";
+import { ScrollView, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { colors } from '../theme/colors';
+import { colors } from "../theme/colors";
 
 export type ScreenProps = {
   children: React.ReactNode;
@@ -12,11 +12,16 @@ export type ScreenProps = {
   edges?: ("top" | "bottom" | "left" | "right")[];
 };
 
-const gradientTop = colors.pagenavy ?? colors.brandNavy ?? '#151E2D';
-const gradientBottom = colors.pagegold ?? 'rgba(189, 146, 80, 0.15)';
+const gradientTop = colors.pagenavy ?? colors.brandNavy ?? "#151E2D";
+const gradientBottom = colors.pagegold ?? "rgba(189, 146, 80, 0.15)";
 const gradientColors: [string, string] = [gradientTop, gradientBottom];
 
-export const Screen: React.FC<ScreenProps> = ({ children, scrollable, contentContainerStyle, edges = [] }) => {
+export const Screen: React.FC<ScreenProps> = ({
+  children,
+  scrollable,
+  contentContainerStyle,
+  edges = [],
+}) => {
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
       <SafeAreaView style={styles.container} edges={edges}>
@@ -29,9 +34,7 @@ export const Screen: React.FC<ScreenProps> = ({ children, scrollable, contentCon
             {children}
           </ScrollView>
         ) : (
-          <>
-            {children}
-          </>
+          <>{children}</>
         )}
       </SafeAreaView>
     </LinearGradient>
@@ -44,7 +47,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   content: {
     flexGrow: 1,

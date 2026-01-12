@@ -28,8 +28,14 @@ export type MainTabParamList = {
     ActiveJobsTab: undefined;
     UpcomingJobsTab: undefined;
     HistoryJobsTab: undefined;
+    ExpensesTab: undefined;
     SupportTab: undefined;
     ProfileTab: undefined;
+};
+
+export type ExpensesStackParamList = {
+    ExpensesList: undefined;
+    AddExpense: undefined;
 };
 
 export type ProfileStackParamList = {

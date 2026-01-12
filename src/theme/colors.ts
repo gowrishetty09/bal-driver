@@ -5,11 +5,13 @@ export const colors = {
     primaryDark: '#151E2D',
     accent: '#FFB570',
     background: '#F4F6FB',
-    text: '#0B1220',
-    muted: '#6E7787',
-    border: '#E0E6F5',
+    text: '#d3e2fe',
+    muted: '#e5e5e5',
+    border: 'rgba(224, 230, 245, 0.75)',
     success: '#24A148',
     danger: '#DA1E28',
-    pagenavy: 'rgba(21, 30, 45, 0.2)',
-    pagegold: 'rgba(189, 146, 80, 0.4)',
+    pagenavy: 'rgba(21, 30, 45, 1)',
+    pagegold: 'rgba(189, 146, 80, 1)',
+    textgold: 'rgb(255, 213, 5)',
+
 };

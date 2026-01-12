@@ -1,16 +1,24 @@
-import React, { useCallback } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { SupportStackParamList } from '../../types/navigation';
-import { useSupportStore } from '../../store/supportStore';
-import { getErrorMessage } from '../../utils/errors';
-import { showErrorToast } from '../../utils/toast';
+import { Screen } from "../../components/Screen";
+import { colors } from "../../theme/colors";
+import { typography } from "../../theme/typography";
+import { SupportStackParamList } from "../../types/navigation";
+import { useSupportStore } from "../../store/supportStore";
+import { getErrorMessage } from "../../utils/errors";
+import { showErrorToast } from "../../utils/toast";
 
 const statusColors: Record<string, string> = {
   OPEN: colors.primary,
@@ -21,7 +29,7 @@ const statusColors: Record<string, string> = {
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString();
 
-type Props = NativeStackScreenProps<SupportStackParamList, 'SupportTickets'>;
+type Props = NativeStackScreenProps<SupportStackParamList, "SupportTickets">;
 
 export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
   const { tickets, isLoadingList, fetchTickets } = useSupportStore();
@@ -30,8 +38,8 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await fetchTickets();
     } catch (error) {
-      const message = getErrorMessage(error, 'Unable to load tickets');
-      showErrorToast('Support', message);
+      const message = getErrorMessage(error, "Unable to load tickets");
+      showErrorToast("Support", message);
     }
   }, [fetchTickets]);
 
@@ -41,16 +49,33 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
     }, [loadTickets])
   );
 
-  const renderItem = ({ item }: { item: typeof tickets[number] }) => (
-    <Pressable style={styles.card} onPress={() => navigation.navigate('SupportTicketDetails', { ticketId: item.id })}>
+  const renderItem = ({ item }: { item: (typeof tickets)[number] }) => (
+    <Pressable
+      style={styles.card}
+      onPress={() =>
+        navigation.navigate("SupportTicketDetails", { ticketId: item.id })
+      }
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.subject}>{item.subject}</Text>
-        <View style={[styles.statusPill, { backgroundColor: statusColors[item.status] ?? colors.brandNavy }]}>
-          <Text style={styles.statusLabel}>{item.status.replace('_', ' ')}</Text>
+        <View
+          style={[
+            styles.statusPill,
+            { backgroundColor: statusColors[item.status] ?? colors.brandNavy },
+          ]}
+        >
+          <Text style={styles.statusLabel}>
+            {item.status.replace("_", " ")}
+          </Text>
         </View>
       </View>
-      <Text style={styles.metaText}>{`${item.category.replace('_', ' ')} • Priority ${item.priority}`}</Text>
-      <Text style={styles.timestamp}>{`Created ${formatDate(item.createdAt)}`}</Text>
+      <Text style={styles.metaText}>{`${item.category.replace(
+        "_",
+        " "
+      )} • Priority ${item.priority}`}</Text>
+      <Text style={styles.timestamp}>{`Created ${formatDate(
+        item.createdAt
+      )}`}</Text>
     </Pressable>
   );
 
@@ -61,10 +86,16 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Support Tickets</Text>
         <View style={styles.headerButtons}>
-          <Pressable style={styles.feedbackButton} onPress={() => navigation.navigate('Feedback', {})}>
+          <Pressable
+            style={styles.feedbackButton}
+            onPress={() => navigation.navigate("Feedback", {})}
+          >
             <Ionicons name="star-outline" size={18} color={colors.brandGold} />
           </Pressable>
-          <Pressable style={styles.newTicketButton} onPress={() => navigation.navigate('NewSupportTicket')}>
+          <Pressable
+            style={styles.newTicketButton}
+            onPress={() => navigation.navigate("NewSupportTicket")}
+          >
             <Text style={styles.newTicketLabel}>New ticket</Text>
           </Pressable>
         </View>
@@ -75,12 +106,21 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : (
         <FlatList
-          contentContainerStyle={tickets.length ? styles.listContent : styles.emptyContent}
+          contentContainerStyle={
+            tickets.length ? styles.listContent : styles.emptyContent
+          }
           data={tickets}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          refreshControl={<RefreshControl refreshing={isLoadingList} onRefresh={loadTickets} />}
-          ListEmptyComponent={empty ? <Text style={styles.emptyText}>No tickets yet.</Text> : null}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoadingList}
+              onRefresh={loadTickets}
+            />
+          }
+          ListEmptyComponent={
+            empty ? <Text style={styles.emptyText}>No tickets yet.</Text> : null
+          }
         />
       )}
     </Screen>
@@ -89,15 +129,15 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   heading: {
@@ -122,8 +162,8 @@ const styles = StyleSheet.create({
   },
   loaderContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   listContent: {
     paddingHorizontal: 16,
@@ -131,8 +171,8 @@ const styles = StyleSheet.create({
   },
   emptyContent: {
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 16,
   },
   emptyText: {
@@ -140,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -148,9 +188,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   subject: {
     fontSize: typography.subheading,
@@ -165,7 +205,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusLabel: {
-    color: '#fff',
+    color: "#fff",
     fontSize: typography.caption,
     fontFamily: typography.fontFamilyMedium,
   },

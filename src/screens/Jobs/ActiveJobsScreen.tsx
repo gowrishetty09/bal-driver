@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,

@@ -28,6 +28,16 @@
       "ios": {
         "resourceClass": "m-medium"
       }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Debug"
+      }
     }
   }
 }

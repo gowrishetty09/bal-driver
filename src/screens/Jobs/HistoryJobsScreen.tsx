@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   jobId: {
     fontSize: typography.caption,
-    color: colors.text,
+    color: colors.textgold,
   },
   passenger: {
     fontSize: typography.body,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 0,
+    paddingVertical: 8,
     backgroundColor: "transparent",
     borderBottomWidth: 1,
     borderBottomColor: colors.pagegold,

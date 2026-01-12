@@ -1534,7 +1534,7 @@ const styles = StyleSheet.create({
   },
   detailsPanel: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: -16,
@@ -1685,7 +1685,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 16,
@@ -1854,7 +1854,7 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
   section: {
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
@@ -1865,6 +1865,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyMedium,
     marginBottom: 12,
     color: colors.text,
+    fontWeight: "600",
   },
   locationRow: {
     flexDirection: "row",
@@ -1892,7 +1893,7 @@ const styles = StyleSheet.create({
   customerName: {
     fontSize: typography.subheading,
     fontFamily: typography.fontFamilyMedium,
-    color: colors.text,
+    color: colors.muted,
   },
   customerContact: {
     fontSize: typography.body,
@@ -1909,7 +1910,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: 12,
+    backgroundColor: colors.brandGold,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1920,7 +1922,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: typography.body,
-    color: colors.primary,
+    color: colors.background,
   },
   actionLabelDisabled: {
     color: colors.muted,
@@ -1958,7 +1960,7 @@ const styles = StyleSheet.create({
   metaValue: {
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
-    color: colors.text,
+    color: colors.brandNavy,
   },
   notes: {
     marginTop: 8,
