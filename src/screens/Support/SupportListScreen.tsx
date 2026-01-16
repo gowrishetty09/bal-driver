@@ -87,6 +87,12 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.heading}>Support Tickets</Text>
         <View style={styles.headerButtons}>
           <Pressable
+            style={styles.helpButton}
+            onPress={() => navigation.navigate("Help")}
+          >
+            <Ionicons name="book-outline" size={18} color={colors.brandGold} />
+          </Pressable>
+          <Pressable
             style={styles.feedbackButton}
             onPress={() => navigation.navigate("Feedback", {})}
           >
@@ -146,6 +152,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamilyBold,
   },
   feedbackButton: {
+    backgroundColor: colors.brandNavy,
+    padding: 10,
+    borderRadius: 12,
+  },
+  helpButton: {
     backgroundColor: colors.brandNavy,
     padding: 10,
     borderRadius: 12,

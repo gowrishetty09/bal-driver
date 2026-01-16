@@ -24,6 +24,7 @@ import { SupportListScreen } from "../screens/Support/SupportListScreen";
 import { SupportTicketDetailsScreen } from "../screens/Support/SupportTicketDetailsScreen";
 import { SupportNewTicketScreen } from "../screens/Support/SupportNewTicketScreen";
 import { FeedbackScreen } from "../screens/Feedback/FeedbackScreen";
+import { HelpScreen } from "../screens/Help/HelpScreen";
 import { useAuth } from "../hooks/useAuth";
 import { useNotificationContext } from "../context/NotificationContext";
 import {
@@ -222,6 +223,14 @@ const SupportStackNavigator = () => {
         component={FeedbackScreen}
         options={{
           title: "Share Feedback",
+          headerRight: () => <HeaderActions onLogout={logout} />,
+        }}
+      />
+      <SupportStack.Screen
+        name="Help"
+        component={HelpScreen}
+        options={{
+          title: "Help Center",
           headerRight: () => <HeaderActions onLogout={logout} />,
         }}
       />

@@ -66,4 +66,5 @@ export type SupportStackParamList = {
     SupportTicketDetails: { ticketId: string };
     NewSupportTicket: undefined;
     Feedback: FeedbackParams | undefined;
+    Help: undefined;
 };
