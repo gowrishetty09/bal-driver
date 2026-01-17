@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:151159935112:android:b1f08105e1809e1bd24f3d",
+        "mobilesdk_app_id": "1:151159935112:android:958c3f68a588a7dbd24f3d",
         "android_client_info": {
-          "package_name": "com.bal.driver"
+          "package_name": "com.bal.admin"
         }
       },
       "oauth_client": [],

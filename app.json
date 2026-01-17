@@ -28,6 +28,7 @@
         "foregroundImage": "./assets/AppIcons/playstore.png",
         "backgroundColor": "#151e2d"
       },
+      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",

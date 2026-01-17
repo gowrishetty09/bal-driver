@@ -3,26 +3,40 @@
  * Initializes notification service and provides state to the app
  */
 import { createContext, useContext } from 'react';
-import { useNotificationService, PendingNavigation } from '../hooks/useNotificationService';
+import { useNotificationService, PendingNavigation, DriverNotification } from '../hooks/useNotificationService';
 
 export type NotificationContextValue = {
   isInitialized: boolean;
   expoPushToken: string | null;
   pendingNavigation: PendingNavigation;
   clearPendingNavigation: () => void;
+  notifications: DriverNotification[];
+  markAsRead: (id: string) => void;
+  clearNotifications: () => void;
 };
 
 export const NotificationContext = createContext<NotificationContextValue | null>(null);
 
 export const NotificationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   // Initialize notification service
-  const { isInitialized, expoPushToken, pendingNavigation, clearPendingNavigation } = useNotificationService();
+  const {
+    isInitialized,
+    expoPushToken,
+    pendingNavigation,
+    clearPendingNavigation,
+    notifications,
+    markAsRead,
+    clearNotifications,
+  } = useNotificationService();
 
   const value: NotificationContextValue = {
     isInitialized,
     expoPushToken,
     pendingNavigation,
     clearPendingNavigation,
+    notifications,
+    markAsRead,
+    clearNotifications,
   };
 
   return (

@@ -27,6 +27,7 @@ import { FeedbackScreen } from "../screens/Feedback/FeedbackScreen";
 import { HelpScreen } from "../screens/Help/HelpScreen";
 import { useAuth } from "../hooks/useAuth";
 import { useNotificationContext } from "../context/NotificationContext";
+import { NotificationsScreen } from "../screens/Notifications/NotificationsScreen";
 import {
   AuthStackParamList,
   FeedbackStackParamList,
@@ -67,8 +68,16 @@ const HeaderSignOutButton: React.FC<{ onPress: () => void }> = ({
   </Pressable>
 );
 
-const HeaderActions: React.FC<{ onLogout: () => void }> = ({ onLogout }) => (
+const HeaderActions: React.FC<{ onLogout: () => void; onNotifications?: () => void }> = ({
+  onLogout,
+  onNotifications,
+}) => (
   <View style={styles.headerActions}>
+    {onNotifications ? (
+      <Pressable onPress={onNotifications} hitSlop={8} style={styles.headerIconButton}>
+        <Ionicons name="notifications-outline" size={20} color={colors.brandGold} />
+      </Pressable>
+    ) : null}
     <SosButton />
     <HeaderSignOutButton onPress={onLogout} />
   </View>
@@ -108,10 +117,20 @@ const HomeStackNavigator = () => {
       <HomeStack.Screen
         name="HomeDashboard"
         component={HomeDashboardScreen}
-        options={{
+        options={({ navigation }) => ({
           title: "Home",
-          headerRight: () => <HeaderActions onLogout={logout} />,
-        }}
+          headerRight: () => (
+            <HeaderActions
+              onLogout={logout}
+              onNotifications={() => navigation.navigate("Notifications")}
+            />
+          ),
+        })}
+      />
+      <HomeStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: "Notifications" }}
       />
     </HomeStack.Navigator>
   );

@@ -23,8 +23,20 @@ import {
     logNotification,
     triggerVibration,
 } from '../utils/notificationHandlers';
+import { NotificationType } from '../types/notifications';
 
 const PUSH_TOKEN_KEY = 'driverPushToken';
+const NOTIFICATIONS_STORAGE_KEY = 'driver_notifications';
+
+export type DriverNotification = {
+    id: string;
+    title: string;
+    body: string;
+    data?: Record<string, string | number | boolean>;
+    timestamp: number;
+    read: boolean;
+    notificationType: NotificationType;
+};
 
 // Configure how notifications are handled when the app is in foreground
 Notifications.setNotificationHandler({
@@ -50,6 +62,7 @@ export const useNotificationService = () => {
     const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
     const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation>(null);
+    const [notifications, setNotifications] = useState<DriverNotification[]>([]);
 
     const notificationListener = useRef<Notifications.EventSubscription | null>(null);
     const responseListener = useRef<Notifications.EventSubscription | null>(null);
@@ -100,6 +113,29 @@ export const useNotificationService = () => {
             console.error('Failed to register push token:', error);
         }
     };
+
+    const upsertNotification = useCallback((notification: DriverNotification) => {
+        setNotifications((prev) => {
+            const existingIndex = prev.findIndex((n) => n.id === notification.id);
+            if (existingIndex !== -1) {
+                const next = [...prev];
+                next[existingIndex] = {
+                    ...notification,
+                    read: prev[existingIndex].read || notification.read,
+                };
+                return next.sort((a, b) => b.timestamp - a.timestamp);
+            }
+            return [notification, ...prev].sort((a, b) => b.timestamp - a.timestamp);
+        });
+    }, []);
+
+    const markAsRead = useCallback((id: string) => {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    }, []);
+
+    const clearNotifications = useCallback(() => {
+        setNotifications([]);
+    }, []);
 
     /**
      * Get Expo push token
@@ -204,6 +240,17 @@ export const useNotificationService = () => {
         console.log('Foreground notification received:', notification);
         logNotification(notificationType, data);
         triggerVibration(notificationType);
+
+        const stored: DriverNotification = {
+            id: notification.request.identifier ?? `${Date.now()}`,
+            title: notification.request.content.title ?? 'Notification',
+            body: notification.request.content.body ?? '',
+            data,
+            timestamp: Date.now(),
+            read: false,
+            notificationType,
+        };
+        upsertNotification(stored);
     };
 
     /**
@@ -216,12 +263,50 @@ export const useNotificationService = () => {
         console.log('Notification tapped:', response);
         logNotification(notificationType, data);
 
+        const tapped: DriverNotification = {
+            id: response.notification.request.identifier ?? `${Date.now()}`,
+            title: response.notification.request.content.title ?? 'Notification',
+            body: response.notification.request.content.body ?? '',
+            data,
+            timestamp: Date.now(),
+            read: true,
+            notificationType,
+        };
+        upsertNotification(tapped);
+
         const navigationAction = handleNotificationPress(data);
         if (navigationAction) {
             // Set pending navigation to be handled by a component inside NavigationContainer
             setPendingNavigation(navigationAction);
         }
+    }, [upsertNotification]);
+
+    // Load persisted notifications once
+    useEffect(() => {
+        let isMounted = true;
+        const load = async () => {
+            try {
+                const stored = await SecureStore.getItemAsync(NOTIFICATIONS_STORAGE_KEY);
+                if (stored && isMounted) {
+                    const parsed = JSON.parse(stored) as DriverNotification[];
+                    setNotifications(parsed);
+                }
+            } catch (error) {
+                console.warn('Failed to load stored notifications:', error);
+            }
+        };
+        load();
+        return () => {
+            isMounted = false;
+        };
     }, []);
+
+    // Persist notifications
+    useEffect(() => {
+        SecureStore.setItemAsync(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications)).catch((error) => {
+            console.warn('Failed to persist notifications:', error);
+        });
+    }, [notifications]);
 
     /**
      * Initialize notifications on authentication
@@ -320,5 +405,8 @@ export const useNotificationService = () => {
         pendingNavigation,
         clearPendingNavigation,
         registerPushToken,
+        notifications,
+        markAsRead,
+        clearNotifications,
     };
 };

@@ -556,6 +556,20 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
   const isJobTerminal = job ? TERMINAL_STATUSES.includes(job.status) : false;
 
+  const paymentMethodNormalized = useMemo(() => {
+    const method = job?.paymentMethod ?? "";
+    return method.replace(/[\s_-]/g, "").toUpperCase();
+  }, [job?.paymentMethod]);
+
+  const needsCashConfirmation = useMemo(() => {
+    if (!job) return false;
+    if (job.paymentStatus === "PAID") return false;
+    return (
+      paymentMethodNormalized === "CASH" ||
+      paymentMethodNormalized === "PAYONDROP"
+    );
+  }, [job, paymentMethodNormalized]);
+
   const getStatusColor = (status?: JobStatus) => {
     switch (status) {
       case "COMPLETED":
@@ -955,8 +969,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   }
                   if (
                     nextStatus === "COMPLETED" &&
-                    (job.paymentMethod ?? "").toUpperCase() === "CASH" &&
-                    job.paymentStatus !== "PAID"
+                    needsCashConfirmation
                   ) {
                     confirmCashAndComplete();
                   } else {
@@ -985,8 +998,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     {nextStatus === "ARRIVED" && "Mark as Arrived"}
                     {nextStatus === "PICKED_UP" && "Start Ride"}
                     {nextStatus === "COMPLETED" &&
-                      ((job.paymentMethod ?? "").toUpperCase() === "CASH" &&
-                      job.paymentStatus !== "PAID"
+                      (needsCashConfirmation
                         ? "Confirm Cash Received"
                         : "Mark Completed")}
                   </Text>
@@ -1427,8 +1439,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 onPress={() => {
                   if (
                     nextStatus === "COMPLETED" &&
-                    (job.paymentMethod ?? "").toUpperCase() === "CASH" &&
-                    job.paymentStatus !== "PAID"
+                    needsCashConfirmation
                   ) {
                     confirmCashAndComplete();
                   } else {
@@ -1444,9 +1455,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.primaryActionLabel}>
-                    {nextStatus === "COMPLETED" &&
-                    (job.paymentMethod ?? "").toUpperCase() === "CASH" &&
-                    job.paymentStatus !== "PAID"
+                    {nextStatus === "COMPLETED" && needsCashConfirmation
                       ? "Confirm Cash Received"
                       : `Mark as ${STATUS_LABELS[nextStatus]}`}
                   </Text>
@@ -1520,7 +1529,7 @@ const styles = StyleSheet.create({
   },
   activeRideContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.pageGradientBg,
   },
   mapSection: {
     height: SCREEN_HEIGHT * 0.35,
@@ -1544,7 +1553,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -1607,7 +1616,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#25D366",
   },
   locationDetailsCard: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.pagenavy,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -1650,7 +1659,7 @@ const styles = StyleSheet.create({
   locationConnector: {
     width: 2,
     height: 20,
-    backgroundColor: colors.border,
+    backgroundColor: colors.pagenavy,
     marginLeft: 5,
     marginVertical: 4,
   },
@@ -1660,15 +1669,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   proximityNear: {
-    backgroundColor: "#E8F5E9",
+    backgroundColor: colors.background,
+    color: colors.brandNavy,
   },
   proximityFar: {
-    backgroundColor: "#FFF3E0",
+    backgroundColor: colors.pagenavy,
   },
   proximityText: {
     fontSize: typography.caption,
     textAlign: "center",
-    color: colors.text,
+    color: colors.brandNavy,
   },
   actionButtonDisabledStyle: {
     backgroundColor: colors.border,

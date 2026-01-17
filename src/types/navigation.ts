@@ -26,6 +26,7 @@ export type HistoryJobsStackParamList = {
 
 export type HomeStackParamList = {
     HomeDashboard: undefined;
+    Notifications: undefined;
 };
 
 export type RidesStackParamList = {

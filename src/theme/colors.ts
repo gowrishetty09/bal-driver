@@ -14,5 +14,6 @@ export const colors = {
     pagegold: 'rgba(189, 146, 80, 1)',
     textgold: 'rgb(255, 213, 5)',
     cardbgtransparent: 'rgba(255, 255, 255, 0.1)',
+    pageGradientBg: 'linear-gradient(180deg, rgba(21, 30, 45, 1) 20%, rgba(189, 146, 80, 1) 100%)',
 
 };
