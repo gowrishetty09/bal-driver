@@ -14,9 +14,28 @@ const fromEnv = (key: string, fallback?: string) => {
 export const API_BASE_URL: string =
     process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://bestaerolimo.online/api';
 
-// WebSocket endpoint (used for realtime driver updates)
-export const WS_URL: string =
-    process.env.EXPO_PUBLIC_WS_URL ?? extra.wsUrl ?? 'wss://bestaerolimo.online/ws';
+const normalizeSocketBaseUrl = (raw: string, apiBaseUrl: string): string => {
+    const fallback = apiBaseUrl.replace(/\/api\/?$/i, '').replace(/\/$/, '');
+    const trimmed = (raw ?? '').trim();
+    if (!trimmed) return fallback;
+
+    // Accept legacy values like ws(s)://host/ws
+    const httpish = trimmed
+        .replace(/^wss:/i, 'https:')
+        .replace(/^ws:/i, 'http:');
+
+    // Strip legacy /ws suffix and /api suffix.
+    return httpish
+        .replace(/\/ws\/?$/i, '')
+        .replace(/\/api\/?$/i, '')
+        .replace(/\/$/, '') || fallback;
+};
+
+// Socket.IO base URL (origin only). Socket path is always /socket.io.
+export const WS_URL: string = normalizeSocketBaseUrl(
+    process.env.EXPO_PUBLIC_WS_URL ?? extra.wsUrl ?? '',
+    API_BASE_URL
+);
 
 export const USE_MOCKS: boolean =
     (process.env.EXPO_PUBLIC_USE_MOCKS ?? '').toLowerCase() === 'true' || Boolean(extra.useMocks);

@@ -25,7 +25,7 @@ const LOCATION_INTERVAL_MS = 3000; // Normal: 3 seconds
 const HIGH_FREQUENCY_INTERVAL_MS = 1000; // Active ride: 1 second
 
 export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, token } = useAuth();
   const [permissionStatus, setPermissionStatus] = useState<LocationPermissionState>('undetermined');
   const [isSharingLocation, setIsSharingLocation] = useState(false);
   const [lastSentAt, setLastSentAt] = useState<string | null>(null);
@@ -43,9 +43,9 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
 
   // Connect/disconnect socket based on authentication
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
+    if (isAuthenticated && user?.id && token) {
       // Initialize socket asynchronously after app is ready
-      socketService.connect(user.id).catch((err: any) => {
+      socketService.connect({ driverId: user.id, token }).catch((err: any) => {
         console.log('[Location] Socket connection error:', err);
       });
     } else {
@@ -55,7 +55,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     return () => {
       socketService.disconnect();
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, token]);
 
   const setActiveBookingId = useCallback((bookingId: string | null) => {
     activeBookingIdRef.current = bookingId;

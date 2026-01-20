@@ -1,16 +1,33 @@
+import { io, type Socket } from 'socket.io-client';
+import { AppState, type AppStateStatus } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { WS_URL } from '../utils/config';
 
 class SocketService {
-	private ws: WebSocket | null = null;
+	private socket: Socket | null = null;
+	private token: string | null = null;
 	private driverId: string | null = null;
 	private connected = false;
-	private reconnectAttempts = 0;
-	private readonly maxReconnectAttempts = 10;
-	private shouldReconnect = false;
-	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
-	private readonly WS_URL = WS_URL;
+	// Offline-safe connection guards
+	private netOnline: boolean | null = null;
+	private appState: AppStateStatus = AppState.currentState;
+	private netUnsub: (() => void) | null = null;
+	private appStateSub: { remove: () => void } | null = null;
+
+	// Offline queue (deduped by key)
+	private readonly MAX_QUEUE = 250;
+	private readonly DEFAULT_TTL_MS = 2 * 60 * 1000;
+	private queuedByKey = new Map<string, { event: string; data: any; expiresAt: number }>();
+	private queuedOrder: string[] = [];
+
+	// Heartbeat
+	private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+	private readonly HEARTBEAT_INTERVAL_MS = 10_000;
+
+	private readonly SOCKET_BASE_URL = WS_URL;
+	private rideSubscriptions = new Set<string>();
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Background Location Batching (Battery Saver)
@@ -20,18 +37,6 @@ class SocketService {
 	private batchFlushTimer: ReturnType<typeof setInterval> | null = null;
 	private currentBookingId: string | null = null;
 	private readonly BATCH_FLUSH_INTERVAL_MS = 5000; // 5 seconds in background
-
-	private getReconnectDelayMs(attemptIndex: number): number {
-		// 1s -> 2s -> 4s -> 5s (cap)
-		return Math.min(1000 * Math.pow(2, attemptIndex), 5000);
-	}
-
-	private clearReconnectTimer(): void {
-		if (this.reconnectTimer) {
-			clearTimeout(this.reconnectTimer);
-			this.reconnectTimer = null;
-		}
-	}
 
 	private emit(event: string, ...args: any[]): void {
 		const handlers = this.listeners.get(event);
@@ -45,134 +50,251 @@ class SocketService {
 		}
 	}
 
-	/**
-	 * Send a message over WebSocket (public wrapper for internal safeSend)
-	 */
-	safeSend(message: WSMessage): boolean {
-		if (!this.ws || !this.connected) return false;
-		try {
-			this.ws.send(JSON.stringify(message));
-			return true;
-		} catch (e) {
-			console.log('[Socket] send failed:', e);
-			return false;
-		}
+	private shouldBeConnected(): boolean {
+		const onlineOk = this.netOnline !== false;
+		const activeOk = this.appState === 'active';
+		return onlineOk && activeOk;
 	}
 
-	private openWebSocket(): void {
-		if (!this.shouldReconnect || !this.driverId) return;
+	private wireConnectivityGuardsOnce(): void {
+		if (this.netUnsub || this.appStateSub) return;
 
-		// Always tear down any existing instance first
-		this.closeWebSocket(false);
+		this.netUnsub = NetInfo.addEventListener((state) => {
+			const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+			this.netOnline = online;
+			this.applyConnectionGate();
+		});
 
-		try {
-			this.ws = new WebSocket(this.WS_URL);
-		} catch (e) {
-			console.log('[Socket] WebSocket constructor failed:', e);
-			this.scheduleReconnect();
-			return;
-		}
-
-		this.ws.onopen = () => {
-			this.connected = true;
-			this.reconnectAttempts = 0;
-			console.log('[Socket] Connected:', this.WS_URL);
-			this.safeSend({ event: 'driver:join', data: { driverId: this.driverId! } });
-			this.emit('connect');
-		};
-
-		this.ws.onmessage = (event) => {
-			const raw = typeof event.data === 'string' ? event.data : '';
-			if (!raw) return;
-			try {
-				const parsed = JSON.parse(raw) as Partial<WSMessage> & { event?: string };
-
-				if (parsed?.event === 'ping') {
-					this.safeSend({ event: 'pong', data: {} });
-					return;
-				}
-
-				if (parsed?.event) {
-					this.emit(parsed.event, (parsed as any).data);
-				}
-			} catch {
-				// ignore non-JSON messages
-			}
-		};
-
-		this.ws.onerror = (event: any) => {
-			// Many RN/Expo platforms provide limited detail; still log what we can.
-			const message = event?.message ?? event?.type ?? event;
-			console.log('[Socket] Error:', message);
-			this.emit('error', message);
-		};
-
-		this.ws.onclose = (event: any) => {
-			this.connected = false;
-			this.ws = null;
-			if (event) {
-				console.log('[Socket] Closed:', {
-					code: event.code,
-					reason: event.reason,
-					wasClean: event.wasClean,
-				});
-			} else {
-				console.log('[Socket] Closed');
-			}
-			this.emit('disconnect');
-			if (this.shouldReconnect) {
-				this.scheduleReconnect();
-			}
-		};
+		this.appStateSub = AppState.addEventListener('change', (next) => {
+			this.appState = next;
+			// Align batching with app lifecycle (battery saver)
+			this.setBackgroundMode(next !== 'active');
+			this.applyConnectionGate();
+		});
 	}
 
-	private closeWebSocket(markIntentional: boolean): void {
-		if (markIntentional) {
-			this.shouldReconnect = false;
-		}
-		this.clearReconnectTimer();
-		this.connected = false;
-		if (this.ws) {
+	private applyConnectionGate(): void {
+		if (!this.socket) return;
+		if (!this.shouldBeConnected()) {
 			try {
-				this.ws.onopen = null;
-				this.ws.onmessage = null;
-				this.ws.onerror = null;
-				this.ws.onclose = null;
-				this.ws.close();
+				this.socket.disconnect();
 			} catch {
 				// ignore
 			}
-			this.ws = null;
-		}
-	}
-
-	private scheduleReconnect(): void {
-		if (!this.shouldReconnect) return;
-		if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-			console.log('[Socket] Max reconnect attempts reached');
 			return;
 		}
 
-		this.clearReconnectTimer();
-		const delay = this.getReconnectDelayMs(this.reconnectAttempts);
-		this.reconnectAttempts += 1;
-		console.log(`[Socket] Reconnecting in ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-		this.reconnectTimer = setTimeout(() => this.openWebSocket(), delay);
+		if (!this.socket.connected) {
+			try {
+				this.socket.connect();
+			} catch {
+				// ignore
+			}
+		}
+
+		this.flushQueuedEmits();
+		this.flushLocationQueue();
+	}
+
+	private enqueueEmit(event: string, data: any, opts?: { key?: string; ttlMs?: number }): void {
+		const ttl = Math.max(1_000, opts?.ttlMs ?? this.DEFAULT_TTL_MS);
+		const key = opts?.key ?? `${event}:${this.safeKeySuffix(data)}`;
+		const existing = this.queuedByKey.has(key);
+		this.queuedByKey.set(key, { event, data, expiresAt: Date.now() + ttl });
+		if (!existing) this.queuedOrder.push(key);
+
+		while (this.queuedOrder.length > this.MAX_QUEUE) {
+			const drop = this.queuedOrder.shift();
+			if (drop) this.queuedByKey.delete(drop);
+		}
+	}
+
+	private safeKeySuffix(data: any): string {
+		try {
+			if (!data) return '0';
+			if (typeof data === 'string') return data.slice(0, 64);
+			if (typeof data === 'number') return String(data);
+			if (typeof data === 'object') {
+				const id = (data as any).bookingId ?? (data as any).rideId ?? (data as any).id;
+				if (typeof id === 'string' || typeof id === 'number') return String(id);
+			}
+			return '1';
+		} catch {
+			return 'x';
+		}
+	}
+
+	private flushQueuedEmits(): void {
+		if (!this.socket || !this.connected) return;
+		const now = Date.now();
+		while (this.queuedOrder.length) {
+			const key = this.queuedOrder[0];
+			if (!key) {
+				this.queuedOrder.shift();
+				continue;
+			}
+			const item = this.queuedByKey.get(key);
+			if (!item) {
+				this.queuedOrder.shift();
+				continue;
+			}
+			if (item.expiresAt <= now) {
+				this.queuedOrder.shift();
+				this.queuedByKey.delete(key);
+				continue;
+			}
+			try {
+				this.socket.emit(item.event, item.data);
+			} catch {
+				break;
+			}
+			this.queuedOrder.shift();
+			this.queuedByKey.delete(key);
+		}
+	}
+
+	private startHeartbeat(): void {
+		if (this.heartbeatTimer) return;
+		this.heartbeatTimer = setInterval(() => {
+			if (!this.driverId) return;
+			this.safeSend({
+				event: 'driver:heartbeat',
+				data: { driverId: this.driverId, timestamp: new Date().toISOString() },
+				options: { key: `driver:heartbeat:${this.driverId}`, ttlMs: 45_000 },
+			});
+		}, this.HEARTBEAT_INTERVAL_MS);
+	}
+
+	private stopHeartbeat(): void {
+		if (!this.heartbeatTimer) return;
+		clearInterval(this.heartbeatTimer);
+		this.heartbeatTimer = null;
+	}
+
+	/**
+	 * Send a message over Socket.IO
+	 */
+	safeSend(message: WSMessage): boolean {
+		const canSend = Boolean(this.socket && this.connected && this.shouldBeConnected());
+		if (!canSend) {
+			// Offline-safe: queue and return true (accepted)
+			this.enqueueEmit(message.event, message.data, message.options);
+			return true;
+		}
+		try {
+			this.socket!.emit(message.event, message.data);
+			return true;
+		} catch (e) {
+			console.log('[Socket] send failed:', e);
+			this.enqueueEmit(message.event, message.data, message.options);
+			return true;
+		}
+	}
+
+	private ensureSocket(): Socket {
+		if (this.socket && this.token) {
+			if (!this.socket.connected) this.socket.connect();
+			return this.socket;
+		}
+
+		if (!this.token) {
+			throw new Error('Socket token is required');
+		}
+
+		try {
+			this.socket?.disconnect();
+		} catch {
+			// ignore
+		}
+
+		this.socket = io(this.SOCKET_BASE_URL, {
+			path: '/socket.io',
+			transports: ['websocket'],
+			auth: { token: this.token },
+			reconnection: true,
+			reconnectionAttempts: 10,
+			reconnectionDelay: 1000,
+			reconnectionDelayMax: 5000,
+			timeout: 20000,
+		});
+
+		this.wireConnectivityGuardsOnce();
+
+		this.socket.on('connect', () => {
+			this.connected = true;
+			console.log('[Socket] Connected:', this.SOCKET_BASE_URL);
+			this.emit('connect');
+			this.startHeartbeat();
+
+			// Re-assert online status + re-join ride rooms.
+			this.safeSend({
+				event: 'driver:status',
+				data: {
+					driverId: this.driverId ?? undefined,
+					status: 'online',
+					updatedAt: new Date().toISOString(),
+				},
+				options: { key: `driver:status:online:${this.driverId ?? 'self'}`, ttlMs: 5 * 60 * 1000 },
+			});
+
+			for (const bookingId of this.rideSubscriptions) {
+				this.safeSend({
+					event: 'ride:join',
+					data: { rideId: bookingId },
+					options: { key: `ride:join:${bookingId}`, ttlMs: 10 * 60 * 1000 },
+				});
+				this.safeSend({
+					event: 'ride:subscribe',
+					data: { bookingId },
+					options: { key: `ride:subscribe:${bookingId}`, ttlMs: 10 * 60 * 1000 },
+				});
+				this.safeSend({
+					event: 'join:ride',
+					data: { bookingId },
+					options: { key: `join:ride:${bookingId}`, ttlMs: 10 * 60 * 1000 },
+				});
+			}
+
+			// Flush any queued payloads collected while offline.
+			this.flushQueuedEmits();
+			this.flushLocationQueue();
+		});
+
+		this.socket.on('disconnect', (reason) => {
+			this.connected = false;
+			console.log('[Socket] Disconnected:', reason);
+			this.emit('disconnect', reason);
+			this.stopHeartbeat();
+		});
+
+		this.socket.on('connect_error', (err) => {
+			const message = (err as any)?.message ?? String(err);
+			console.log('[Socket] Error:', message);
+			this.emit('error', err);
+		});
+
+		this.socket.onAny((event, ...args) => {
+			this.emit(event, ...(args as any[]));
+		});
+
+		// Apply gate immediately (don’t spin reconnect loops in background/offline)
+		this.applyConnectionGate();
+
+		return this.socket;
 	}
 
 	/**
 	 * Connect only when authenticated (LocationContext controls when this is called).
 	 * Does not block app startup.
 	 */
-	async connect(driverId: string): Promise<void> {
-		if (this.driverId === driverId && this.connected) {
-			return;
+	async connect(params: { driverId: string; token: string }): Promise<void> {
+		if (!params?.token) {
+			throw new Error('Driver access token is required for realtime socket');
 		}
 
-		this.driverId = driverId;
-		this.shouldReconnect = true;
-		this.reconnectAttempts = 0;
-		this.openWebSocket();
+		this.driverId = params.driverId;
+		this.token = params.token;
+		this.ensureSocket();
 	}
 
 	/**
@@ -180,8 +302,31 @@ class SocketService {
 	 */
 	disconnect(): void {
 		this.stopBatchFlush();
-		this.closeWebSocket(true);
+		this.stopHeartbeat();
+		this.connected = false;
+		this.rideSubscriptions.clear();
+		try {
+			this.netUnsub?.();
+		} catch {
+			// ignore
+		}
+		this.netUnsub = null;
+		try {
+			this.appStateSub?.remove();
+		} catch {
+			// ignore
+		}
+		this.appStateSub = null;
+		this.queuedByKey.clear();
+		this.queuedOrder.splice(0);
+		try {
+			this.socket?.disconnect();
+		} catch {
+			// ignore
+		}
+		this.socket = null;
 		this.driverId = null;
+		this.token = null;
 	}
 
 	/**
@@ -240,7 +385,7 @@ class SocketService {
 	 */
 	private flushLocationQueue(): void {
 		if (this.locationQueue.length === 0) return;
-		if (!this.connected || !this.driverId) {
+		if (!this.connected || !this.driverId || !this.socket) {
 			// Keep queue for when we reconnect
 			console.log('[Socket] Not connected, keeping queue:', this.locationQueue.length);
 			return;
@@ -249,14 +394,17 @@ class SocketService {
 		const points = this.locationQueue.splice(0);
 		console.log('[Socket] Flushing location batch:', points.length);
 
-		this.safeSend({
-			event: 'driver:updateLocationBatch',
-			data: {
+		for (const point of points) {
+			this.socket.emit('driver:location', {
 				driverId: this.driverId,
-				points,
+				latitude: point.latitude,
+				longitude: point.longitude,
+				heading: point.heading,
+				speed: point.speed,
 				bookingId: this.currentBookingId ?? undefined,
-			},
-		});
+				timestamp: point.timestamp ?? new Date().toISOString(),
+			});
+		}
 	}
 
 	/**
@@ -288,39 +436,65 @@ class SocketService {
 				speed: data.speed,
 				timestamp: new Date().toISOString(),
 			});
+			// Bound queue to avoid unbounded growth while offline/background
+			if (this.locationQueue.length > 100) {
+				this.locationQueue.splice(0, this.locationQueue.length - 100);
+			}
 			return true;
 		}
 
 		// Foreground: send immediately
-		if (!this.connected) {
-			return false;
+		if (!this.connected || !this.socket || !this.shouldBeConnected()) {
+			// Offline-safe: enqueue into the location queue and flush on reconnect
+			this.locationQueue.push({
+				latitude: data.latitude,
+				longitude: data.longitude,
+				heading: data.heading,
+				speed: data.speed,
+				timestamp: new Date().toISOString(),
+			});
+			if (this.locationQueue.length > 100) {
+				this.locationQueue.splice(0, this.locationQueue.length - 100);
+			}
+			return true;
 		}
 
-		return this.safeSend({
-			event: 'driver:updateLocation',
-			data: {
+		try {
+			this.socket.emit('driver:location', {
 				driverId: this.driverId,
 				latitude: data.latitude,
 				longitude: data.longitude,
 				heading: data.heading,
 				speed: data.speed,
 				bookingId: data.bookingId,
-			},
-		});
+				timestamp: new Date().toISOString(),
+			});
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/**
 	 * Join a booking room to receive updates for a specific booking
 	 */
 	joinBookingRoom(bookingId: string): void {
-		this.safeSend({ event: 'join:booking', data: { bookingId } });
+		if (!bookingId) return;
+		this.rideSubscriptions.add(bookingId);
+		this.safeSend({ event: 'ride:join', data: { rideId: bookingId }, options: { key: `ride:join:${bookingId}`, ttlMs: 10 * 60 * 1000 } });
+		this.safeSend({ event: 'ride:subscribe', data: { bookingId }, options: { key: `ride:subscribe:${bookingId}`, ttlMs: 10 * 60 * 1000 } });
+		this.safeSend({ event: 'join:ride', data: { bookingId }, options: { key: `join:ride:${bookingId}`, ttlMs: 10 * 60 * 1000 } });
 	}
 
 	/**
 	 * Leave a booking room
 	 */
 	leaveBookingRoom(bookingId: string): void {
-		this.safeSend({ event: 'leave:booking', data: { bookingId } });
+		if (!bookingId) return;
+		this.rideSubscriptions.delete(bookingId);
+		this.safeSend({ event: 'ride:leave', data: { rideId: bookingId }, options: { key: `ride:leave:${bookingId}`, ttlMs: 10 * 60 * 1000 } });
+		this.safeSend({ event: 'ride:unsubscribe', data: { bookingId }, options: { key: `ride:unsubscribe:${bookingId}`, ttlMs: 10 * 60 * 1000 } });
+		this.safeSend({ event: 'leave:ride', data: { bookingId }, options: { key: `leave:ride:${bookingId}`, ttlMs: 10 * 60 * 1000 } });
 	}
 
 	/**
@@ -359,10 +533,19 @@ interface LocationPoint {
 	timestamp?: string;
 }
 
+type WSMessageBase = {
+	options?: { key?: string; ttlMs?: number };
+};
+
 type WSMessage =
-	| { event: 'driver:join'; data: { driverId: string } }
-	| {
-		event: 'driver:updateLocation';
+	| (WSMessageBase & { event: 'driver:status'; data: { driverId?: string; status: 'online' | 'offline'; updatedAt?: string } })
+	| (WSMessageBase & { event: 'driver:heartbeat'; data: { driverId: string; timestamp?: string } })
+	| (WSMessageBase & { event: 'ride:join'; data: { rideId: string } })
+	| (WSMessageBase & { event: 'ride:leave'; data: { rideId: string } })
+	| (WSMessageBase & { event: 'join:ride'; data: { bookingId: string } })
+	| (WSMessageBase & { event: 'leave:ride'; data: { bookingId: string } })
+	| (WSMessageBase & {
+		event: 'driver:location';
 		data: {
 			driverId: string;
 			latitude: number;
@@ -370,31 +553,20 @@ type WSMessage =
 			heading?: number;
 			speed?: number;
 			bookingId?: string;
+			timestamp?: string;
 		};
-	}
-	| {
-		event: 'driver:updateLocationBatch';
-		data: {
-			driverId: string;
-			points: LocationPoint[];
-			bookingId?: string;
-		};
-	}
-	| { event: 'join:booking'; data: { bookingId: string } }
-	| { event: 'leave:booking'; data: { bookingId: string } }
-	| { event: 'driver:location'; data: any }
-	| { event: 'driver:locationAck'; data: any }
-	| { event: 'joined:booking'; data: any }
-	| { event: 'ping'; data: {} }
-	| { event: 'pong'; data: {} }
-	| {
+	})
+	| (WSMessageBase & { event: 'ride:subscribe'; data: { bookingId: string } })
+	| (WSMessageBase & { event: 'ride:unsubscribe'; data: { bookingId: string } })
+	| (WSMessageBase & { event: 'driver:location'; data: any })
+	| (WSMessageBase & {
 		event: 'driver:statusNotification';
 		data: {
 			bookingId: string;
 			notificationType: 'arrived' | 'at_pickup' | 'en_route' | 'picked_up';
 			timestamp: string;
 		};
-	};
+	});
 
 // Export singleton instance
 export const socketService = new SocketService();

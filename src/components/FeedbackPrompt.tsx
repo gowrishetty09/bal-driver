@@ -37,7 +37,7 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
   const { submit, isSubmitting } = useFeedbackStore();
   const [rating, setRating] = useState(0);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const autoDismissTimer = useRef<NodeJS.Timeout | null>(null);
+  const autoDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Animate in/out
   useEffect(() => {
