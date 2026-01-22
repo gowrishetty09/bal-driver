@@ -12,7 +12,7 @@ export type ScreenProps = {
   edges?: ("top" | "bottom" | "left" | "right")[];
 };
 
-const gradientTop = colors.pagenavy ?? colors.brandNavy ?? "#151E2D";
+const gradientTop = colors.pagenavy ?? colors.brandNavy ?? "#151e2d";
 const gradientBottom = colors.pagegold ?? "rgba(189, 146, 80, 0.15)";
 const gradientColors: [string, string] = [gradientTop, gradientBottom];
 

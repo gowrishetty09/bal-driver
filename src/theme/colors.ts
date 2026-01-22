@@ -1,8 +1,8 @@
 export const colors = {
-    brandNavy: '#151E2D',
+    brandNavy: '#151e2d',
     brandGold: '#BD9250',
     primary: '#BD9250',
-    primaryDark: '#151E2D',
+    primaryDark: '#151e2d',
     accent: '#FFB570',
     background: '#F4F6FB',
     text: '#d3e2fe',

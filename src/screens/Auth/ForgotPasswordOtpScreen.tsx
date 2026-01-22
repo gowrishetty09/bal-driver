@@ -118,7 +118,7 @@ export const ForgotPasswordOtpScreen: React.FC<Props> = ({ route, navigation }) 
                         disabled={!canSubmit || isSubmitting}
                     >
                         {isSubmitting ? (
-                            <ActivityIndicator color="#151E2D" />
+                            <ActivityIndicator color="#151e2d" />
                         ) : (
                             <Text style={styles.primaryButtonLabel}>Verify code</Text>
                         )}
