@@ -13,24 +13,29 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { SupportStackParamList } from '../../types/navigation';
 import { useSupportStore } from '../../store/supportStore';
 import { getErrorMessage } from '../../utils/errors';
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 
-const statusColors: Record<string, string> = {
-  OPEN: colors.primary,
-  IN_PROGRESS: colors.brandNavy,
-  RESOLVED: colors.success,
-  CLOSED: colors.muted,
+const getStatusColor = (status: string, colors: ThemeColors): string => {
+  const statusColors: Record<string, string> = {
+    OPEN: colors.primary,
+    IN_PROGRESS: colors.brandNavy,
+    RESOLVED: colors.success,
+    CLOSED: colors.muted,
+  };
+  return statusColors[status] ?? colors.brandNavy;
 };
 
 type Props = NativeStackScreenProps<SupportStackParamList, 'SupportTicketDetails'>;
 
 export const SupportTicketDetailsScreen: React.FC<Props> = ({ route }) => {
   const { ticketId } = route.params;
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { selectedTicket, isLoadingTicket, selectTicket, sendMessage } = useSupportStore();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -89,7 +94,7 @@ export const SupportTicketDetailsScreen: React.FC<Props> = ({ route }) => {
         <View style={styles.header}>
           <Text style={styles.subject}>{selectedTicket.subject}</Text>
           <View
-            style={[styles.statusPill, { backgroundColor: statusColors[selectedTicket.status] ?? colors.brandNavy }]}
+            style={[styles.statusPill, { backgroundColor: getStatusColor(selectedTicket.status, colors) }]}
           >
             <Text style={styles.statusLabel}>{selectedTicket.status}</Text>
           </View>
@@ -139,7 +144,7 @@ export const SupportTicketDetailsScreen: React.FC<Props> = ({ route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   flex: {
     flex: 1,
   },
@@ -168,7 +173,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   statusLabel: {
-    color: '#fff',
+    color: colors.textInverse,
     fontSize: typography.caption,
   },
   metaText: {
@@ -223,7 +228,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
   },
   input: {
     borderWidth: 1,

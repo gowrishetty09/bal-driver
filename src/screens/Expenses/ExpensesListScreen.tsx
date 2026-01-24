@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { listDriverExpenses, type Expense } from "../../api/expenses";
 import { Screen } from "../../components/Screen";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { getErrorMessage } from "../../utils/errors";
 import { showErrorToast } from "../../utils/toast";
@@ -31,6 +31,8 @@ const formatDateTime = (iso: string) => {
 export const ExpensesListScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<ExpensesStackParamList>>();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [history, setHistory] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,7 +155,7 @@ export const ExpensesListScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     padding: 16,
     paddingBottom: 40,
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
   },
   card: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusText: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.caption,
     fontFamily: typography.fontFamilyMedium,
   },

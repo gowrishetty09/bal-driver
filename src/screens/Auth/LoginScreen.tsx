@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,11 +12,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../../hooks/useAuth';
-import { colors } from '../../theme/colors';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { getErrorMessage } from '../../utils/errors';
@@ -26,9 +27,12 @@ type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NavigationProp>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async () => {
@@ -52,159 +56,214 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.brandNavy} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
         keyboardVerticalOffset={0}
       >
         <View style={styles.container}>
-          {/* Header Section */}
-          <View style={styles.headerSection}>
-            <Image
-              source={require('../../../assets/driver-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+          {/* Logo Section */}
+          <View style={styles.logoSection}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../../assets/splash-icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.welcomeText}>Welcome back</Text>
+            <Text style={styles.subtitleText}>Sign in to continue</Text>
           </View>
 
-          {/* Form Card */}
-          <View style={styles.formCard}>
+          {/* Form Section */}
+          <View style={styles.formSection}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Username</Text>
-              <TextInput
-                style={styles.input}
-                placeholder=""
-                placeholderTextColor="#999999"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="mail-outline" size={20} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email"
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder=""
-                placeholderTextColor="#999999"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your password"
+                  placeholderTextColor={colors.muted}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
+                  <Ionicons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color={colors.muted}
+                  />
+                </Pressable>
+              </View>
             </View>
 
-            <View style={styles.actionsRow}>
+            <View style={styles.forgotRow}>
               <Pressable hitSlop={8} onPress={() => navigation.navigate('ForgotPasswordEmail')}>
-                <Text style={styles.forgotPassword}>Forgot Password ?</Text>
-              </Pressable>
-
-              <Pressable 
-                style={styles.loginButton} 
-                onPress={handleLogin} 
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color={colors.brandNavy} size="small" />
-                ) : (
-                  <Text style={styles.loginButtonLabel}>LOGIN</Text>
-                )}
+                <Text style={styles.forgotPassword}>Forgot Password?</Text>
               </Pressable>
             </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.loginButton,
+                pressed && styles.loginButtonPressed,
+                isSubmitting && styles.loginButtonDisabled,
+              ]}
+              onPress={handleLogin}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.loginButtonLabel}>Sign In</Text>
+              )}
+            </Pressable>
           </View>
+
         </View>
       </KeyboardAvoidingView>
     </View>
   );
 };
 
-const FORM_CARD_COLOR = '#8B7355'; // Brown/gold color for form card
-
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.brandNavy,
+    backgroundColor: '#FFFFFF',
   },
   keyboardView: {
     flex: 1,
   },
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 24,
+    justifyContent: 'center',
   },
-  headerSection: {
+  logoSection: {
     alignItems: 'center',
     marginBottom: 40,
   },
-  driverText: {
-    color: colors.brandGold,
-    fontSize: 14,
-    fontFamily: typography.fontFamilyMedium,
-    letterSpacing: 4,
-    marginBottom: 8,
+  logoContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 24,
+    backgroundColor: colors.brandNavy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: colors.brandNavy,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   logo: {
-    width: 218,
-    height: 220,
+    width: 80,
+    height: 80,
   },
-  formCard: {
+  welcomeText: {
+    fontSize: 28,
+    fontFamily: typography.fontFamilyBold,
+    color: colors.brandNavy,
+    marginBottom: 8,
+  },
+  subtitleText: {
+    fontSize: 16,
+    color: colors.muted,
+    fontFamily: typography.fontFamilyRegular,
+  },
+  formSection: {
     width: '100%',
-    backgroundColor: FORM_CARD_COLOR,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.brandGold,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
   },
   inputGroup: {
-    width: '100%',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    color: '#fff',
+    color: colors.brandNavy,
     marginBottom: 8,
     fontFamily: typography.fontFamilyMedium,
   },
-  input: {
-    width: '100%',
-    borderRadius: 2,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#333',
-    backgroundColor: 'rgba(255, 255, 255, 0.75)', // Cream/beige color
-  },
-  actionsRow: {
-    width: '100%',
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    backgroundColor: '#F5F5F7',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5E7',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: colors.text,
+    fontFamily: typography.fontFamilyRegular,
+  },
+  forgotRow: {
+    alignItems: 'flex-end',
+    marginBottom: 24,
   },
   forgotPassword: {
-    color: colors.brandNavy,
-    fontSize: 13,
-    fontFamily: typography.fontFamilyMedium,
-    textDecorationLine: 'underline',
-  },
-  loginButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 28,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: colors.brandNavy,
-    backgroundColor: '#D4CCC4',
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  loginButtonLabel: {
-    color: colors.brandNavy,
+    color: colors.primary,
     fontSize: 14,
     fontFamily: typography.fontFamilyMedium,
-    letterSpacing: 1,
+  },
+  loginButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: colors.brandNavy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.brandNavy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  loginButtonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
+  },
+  loginButtonLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: typography.fontFamilyBold,
+    letterSpacing: 0.5,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  footerText: {
+    fontSize: 12,
+    color: colors.muted,
+    fontFamily: typography.fontFamilyRegular,
   },
 });

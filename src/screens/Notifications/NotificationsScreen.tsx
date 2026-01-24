@@ -5,11 +5,13 @@ import { useNavigation } from "@react-navigation/native";
 
 import { useNotificationContext } from "../../context/NotificationContext";
 import { handleNotificationPress } from "../../utils/notificationHandlers";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { notifications, markAsRead } = useNotificationContext();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const sorted = useMemo(
     () => [...notifications].sort((a, b) => b.timestamp - a.timestamp),
@@ -66,7 +68,7 @@ export const NotificationsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     padding: 16,
     paddingBottom: 24,
@@ -76,29 +78,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 32,
-    backgroundColor: colors.brandNavy,
+    backgroundColor: colors.background,
   },
   emptyTitle: {
     marginTop: 12,
     fontSize: 18,
     fontWeight: "700",
-    color: "#fff",
+    color: colors.text,
   },
   emptyText: {
     marginTop: 6,
-    color: "rgba(255,255,255,0.75)",
+    color: colors.textSecondary,
     textAlign: "center",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     marginBottom: 12,
   },
   cardUnread: {
-    borderColor: "rgba(189, 146, 80, 0.65)",
+    borderColor: colors.brandGold,
   },
   row: {
     flexDirection: "row",
@@ -112,23 +114,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111827",
+    color: colors.text,
     marginBottom: 4,
   },
   body: {
     fontSize: 14,
-    color: "#374151",
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   meta: {
     fontSize: 12,
-    color: "#6b7280",
+    color: colors.textMuted,
   },
   dot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#dc2626",
+    backgroundColor: colors.error,
   },
 });
 

@@ -14,7 +14,7 @@ import {
 
 import { DriverJob, getDriverJobs } from '../api/driver';
 import { logSosEvent, resolveCurrentLocation, SosKind } from '../api/sos';
-import { colors } from '../theme/colors';
+import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { SOS_CONTACTS, SUPPORT_EMAIL } from '../utils/config';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
@@ -64,6 +64,8 @@ const buildOptions = (): SosOption[] => [
 const sanitizePhone = (phone: string) => phone.replace(/[^+\d]/g, '');
 
 export const SosModal: React.FC<SosModalProps> = ({ visible, onRequestClose }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const options = useMemo(buildOptions, []);
   const [processing, setProcessing] = useState<SosKind | null>(null);
   const [tripContext, setTripContext] = useState<{ bookingId: string; reference?: string } | null>(null);
@@ -257,14 +259,14 @@ export const SosModal: React.FC<SosModalProps> = ({ visible, onRequestClose }) =
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -337,7 +339,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeLabel: {
-    color: '#fff',
+    color: colors.textInverse,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },

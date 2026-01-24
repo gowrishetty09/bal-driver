@@ -2,11 +2,13 @@ import React, { useCallback } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useLocationService } from '../hooks/useLocationService';
-import { colors } from '../theme/colors';
+import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 
 export const LocationStatusBanner: React.FC = () => {
   const { permissionStatus, isSharingLocation, requestPermission } = useLocationService();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const permissionGranted = permissionStatus === 'granted';
   const showBanner = !permissionGranted || (permissionGranted && !isSharingLocation);
@@ -60,7 +62,7 @@ export const LocationStatusBanner: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -74,11 +76,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#af6600',
   },
   warning: {
-    backgroundColor: colors.cardbgtransparent,
-    borderColor: '#FDD49A',
+    backgroundColor: colors.card,
+    borderColor: colors.warning,
   },
   paused: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderColor: colors.primary,
   },
   textBlock: {
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   buttonLabel: {
-    color: '#fff',
+    color: colors.textInverse,
     fontSize: typography.caption,
     fontFamily: typography.fontFamilyMedium,
   },

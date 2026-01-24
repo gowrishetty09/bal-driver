@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { SupportStackParamList } from '../../types/navigation';
 import { useSupportStore } from '../../store/supportStore';
@@ -27,6 +27,8 @@ const priorityOptions: Array<{ label: string; value: TicketPriority }> = [
 type Props = NativeStackScreenProps<SupportStackParamList, 'NewSupportTicket'>;
 
 export const SupportNewTicketScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { createTicket } = useSupportStore();
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -137,7 +139,7 @@ export const SupportNewTicketScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     padding: 16,
     paddingBottom: 40,
@@ -157,7 +159,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: typography.body,
     color: colors.text,
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBackground,
   },
   multiline: {
     minHeight: 140,

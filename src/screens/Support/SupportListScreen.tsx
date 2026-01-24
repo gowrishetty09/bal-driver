@@ -13,18 +13,21 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Screen } from "../../components/Screen";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { SupportStackParamList } from "../../types/navigation";
 import { useSupportStore } from "../../store/supportStore";
 import { getErrorMessage } from "../../utils/errors";
 import { showErrorToast } from "../../utils/toast";
 
-const statusColors: Record<string, string> = {
-  OPEN: colors.primary,
-  IN_PROGRESS: colors.brandNavy,
-  RESOLVED: colors.success,
-  CLOSED: colors.muted,
+const getStatusColor = (status: string, colors: ThemeColors): string => {
+  const statusColors: Record<string, string> = {
+    OPEN: colors.primary,
+    IN_PROGRESS: colors.brandNavy,
+    RESOLVED: colors.success,
+    CLOSED: colors.muted,
+  };
+  return statusColors[status] ?? colors.brandNavy;
 };
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString();
@@ -33,6 +36,8 @@ type Props = NativeStackScreenProps<SupportStackParamList, "SupportTickets">;
 
 export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
   const { tickets, isLoadingList, fetchTickets } = useSupportStore();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const loadTickets = useCallback(async () => {
     try {
@@ -61,7 +66,7 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
         <View
           style={[
             styles.statusPill,
-            { backgroundColor: statusColors[item.status] ?? colors.brandNavy },
+            { backgroundColor: getStatusColor(item.status, colors) },
           ]}
         >
           <Text style={styles.statusLabel}>
@@ -133,7 +138,7 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -191,7 +196,7 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
   },
   card: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,

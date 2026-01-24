@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { getErrorMessage } from '../../utils/errors';
@@ -27,6 +27,8 @@ type NavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ForgotPassw
 
 export const ForgotPasswordEmailScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp>();
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [email, setEmail] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -114,7 +116,7 @@ export const ForgotPasswordEmailScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
     screen: {
         flexGrow: 1,
         justifyContent: 'center',
@@ -151,7 +153,7 @@ const styles = StyleSheet.create({
         lineHeight: 22,
     },
     card: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.card,
         borderRadius: 24,
         padding: 24,
         shadowColor: '#1F2A44',
@@ -189,7 +191,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 18,
         paddingVertical: 14,
         fontSize: typography.body,
-        backgroundColor: colors.background,
+        backgroundColor: colors.inputBackground,
         color: colors.text,
     },
     primaryButton: {
@@ -211,7 +213,7 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
     },
     secondaryActionLabel: {
-        color: colors.brandNavy,
+        color: colors.primary,
         fontSize: typography.body,
         textDecorationLine: 'underline',
     },

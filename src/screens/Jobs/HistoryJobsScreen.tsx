@@ -14,7 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { Screen } from "../../components/Screen";
 import { LocationStatusBanner } from "../../components/LocationStatusBanner";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { HistoryJobsStackParamList } from "../../types/navigation";
 import { DriverJob } from "../../api/driver";
@@ -24,6 +24,8 @@ import { formatMYR, shortBookingRef } from "../../utils/format";
 type Props = NativeStackScreenProps<HistoryJobsStackParamList, "HistoryJobs">;
 
 export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const {
     bookings: jobs,
     isLoading: loading,
@@ -160,7 +162,7 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   list: {
     flex: 1,
   },
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -184,7 +186,7 @@ const styles = StyleSheet.create({
   },
   jobId: {
     fontSize: typography.caption,
-    color: colors.textgold,
+    color: colors.brandGold,
   },
   passenger: {
     fontSize: typography.body,
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: colors.pagegold,
+    borderBottomColor: colors.brandGold,
   },
   searchInput: {
     flex: 1,

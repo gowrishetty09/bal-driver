@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { StarRating } from './StarRating';
-import { colors } from '../theme/colors';
+import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 import { useFeedbackStore } from '../store/feedbackStore';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
@@ -34,6 +34,8 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
   bookingId,
   title = 'How was this trip?',
 }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { submit, isSubmitting } = useFeedbackStore();
   const [rating, setRating] = useState(0);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -204,7 +206,7 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 12,

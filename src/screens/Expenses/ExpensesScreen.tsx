@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { submitDriverExpense, type DriverExpenseTypeInput } from "../../api/expenses";
 import { Screen } from "../../components/Screen";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { getErrorMessage } from "../../utils/errors";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
@@ -36,6 +36,8 @@ const parseYmdToIso = (ymd: string): string | null => {
 
 export const AddExpenseScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<ExpensesStackParamList>>();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const [expenseType, setExpenseType] = useState<DriverExpenseTypeInput>("fuel");
   const [amountText, setAmountText] = useState("");
@@ -164,7 +166,7 @@ export const AddExpenseScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     padding: 16,
     paddingBottom: 40,
@@ -195,7 +197,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: typography.body,
     color: colors.text,
-    backgroundColor: "#fff",
+    backgroundColor: colors.inputBackground,
   },
   multiline: {
     minHeight: 110,

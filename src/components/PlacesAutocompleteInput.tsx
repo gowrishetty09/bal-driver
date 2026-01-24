@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { fetchPlacePredictions, PlacePrediction } from '../services/googlePlaces';
-import { colors } from '../theme/colors';
+import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 
 export type PlacesAutocompleteInputProps = {
@@ -16,6 +16,8 @@ export const PlacesAutocompleteInput: React.FC<PlacesAutocompleteInputProps> = (
   initialValue = '',
   onSelect,
 }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [query, setQuery] = useState(initialValue);
   const [results, setResults] = useState<PlacePrediction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -104,7 +106,7 @@ export const PlacesAutocompleteInput: React.FC<PlacesAutocompleteInputProps> = (
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     marginTop: 12,
   },
@@ -116,14 +118,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: typography.body,
     color: colors.text,
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBackground,
   },
   dropdown: {
     marginTop: 4,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     maxHeight: 220,
     overflow: 'hidden',
   },

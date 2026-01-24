@@ -20,7 +20,7 @@ import MapView, {
   PROVIDER_GOOGLE,
   Region,
 } from "react-native-maps";
-import { colors } from "../theme/colors";
+import { useTheme, ThemeColors } from "../context/ThemeContext";
 import { typography } from "../theme/typography";
 import type { Coordinates, JobStatus } from "../api/driver";
 import { GOOGLE_DIRECTIONS_API_KEY } from "../utils/config";
@@ -110,6 +110,8 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   estimatedTime,
   estimatedDistance,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const readLatLng = (c?: any) => {
     if (!c)
       return {
@@ -525,7 +527,7 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     height: 250,
     borderRadius: 0,
@@ -588,7 +590,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   markerLabel: {
-    color: "#000000ff",
+    color: colors.text,
     fontSize: 14,
     fontWeight: "bold",
   },
@@ -607,7 +609,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.primary,
     borderWidth: 3,
-    borderColor: "#fff",
+    borderColor: colors.textInverse,
   },
   dropDot: {
     backgroundColor: colors.accent,
@@ -622,7 +624,7 @@ const styles = StyleSheet.create({
   etaBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.95)",
+    backgroundColor: colors.card,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
@@ -660,7 +662,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   navigateButtonText: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -671,8 +673,8 @@ const styles = StyleSheet.create({
     right: 60,
   },
   statusText: {
-    backgroundColor: "rgba(0,0,0,0.75)",
-    color: "#fff",
+    backgroundColor: colors.mapOverlay,
+    color: colors.textInverse,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,

@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useSos } from '../hooks/useSos';
-import { colors } from '../theme/colors';
+import { useTheme, ThemeColors } from '../context/ThemeContext';
 
 export const SosButton: React.FC = () => {
   const { openSos } = useSos();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   return (
     <Pressable style={styles.button} onPress={openSos} hitSlop={10}>
@@ -16,7 +18,7 @@ export const SosButton: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',

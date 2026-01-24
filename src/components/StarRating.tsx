@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 export type StarRatingProps = {
   rating: number;
@@ -18,9 +18,13 @@ export const StarRating: React.FC<StarRatingProps> = ({
   onRatingChange,
   size = 40,
   readonly = false,
-  starColor = colors.brandGold,
-  emptyColor = colors.border,
+  starColor,
+  emptyColor,
 }) => {
+  const { colors } = useTheme();
+  const actualStarColor = starColor ?? colors.brandGold;
+  const actualEmptyColor = emptyColor ?? colors.border;
+
   const handlePress = (star: number) => {
     if (!readonly && onRatingChange) {
       onRatingChange(star);
@@ -46,7 +50,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
           <Ionicons
             name={star <= rating ? 'star' : 'star-outline'}
             size={size}
-            color={star <= rating ? starColor : emptyColor}
+            color={star <= rating ? actualStarColor : actualEmptyColor}
           />
         </Pressable>
       ))}

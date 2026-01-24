@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
-import { colors } from '../../theme/colors';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 
 interface HelpSection {
   key: string;
@@ -170,6 +170,8 @@ const faqItems = [
 ];
 
 export const HelpScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
@@ -293,7 +295,7 @@ export const HelpScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -335,7 +337,7 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.textInverse,
   },
   sectionsContainer: {
     padding: 16,
@@ -347,7 +349,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   section: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 10,
     marginBottom: 8,
     overflow: 'hidden',
@@ -392,7 +394,7 @@ const styles = StyleSheet.create({
   contactCard: {
     margin: 16,
     padding: 20,
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,

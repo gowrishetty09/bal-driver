@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -11,7 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 
 import { Screen } from "../../components/Screen";
 import { LocationStatusBanner } from "../../components/LocationStatusBanner";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { useAuth } from "../../hooks/useAuth";
 import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
@@ -37,12 +37,16 @@ const dayKey = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-const buildLastNDays = (n: number) => {
+const buildWeekDays = () => {
   const days: Date[] = [];
-  for (let i = n - 1; i >= 0; i -= 1) {
-    const dt = new Date();
-    dt.setHours(0, 0, 0, 0);
-    dt.setDate(dt.getDate() - i);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Show 3 days before + today + 3 days after (7 days centered on today)
+  // This ensures upcoming bookings for tomorrow/next few days are visible
+  for (let i = -3; i <= 3; i++) {
+    const dt = new Date(today);
+    dt.setDate(today.getDate() + i);
     days.push(dt);
   }
   return days;
@@ -59,6 +63,8 @@ const getJobAmount = (job: DriverJob) =>
 export const HomeDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const active = useRealtimeJobs("ACTIVE");
   const upcoming = useRealtimeJobs("UPCOMING");
@@ -66,6 +72,19 @@ export const HomeDashboardScreen: React.FC = () => {
 
   const isLoading =
     active.isLoading || upcoming.isLoading || history.isLoading;
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    // Trigger refresh on all job types
+    await Promise.all([
+      active.refresh?.(),
+      upcoming.refresh?.(),
+      history.refresh?.(),
+    ]);
+    setIsRefreshing(false);
+  }, [active, upcoming, history]);
 
   const stats = useMemo(() => {
     const activeCount = active.bookings.length;
@@ -94,18 +113,23 @@ export const HomeDashboardScreen: React.FC = () => {
 
   const recentJobs = useMemo(() => {
     const all = [...active.bookings, ...upcoming.bookings, ...history.bookings];
-    return all
-      .slice()
+    // Deduplicate by job ID
+    const uniqueJobs = Array.from(
+      new Map(all.map((job) => [job.id, job])).values()
+    );
+    return uniqueJobs
       .sort((a, b) => getJobTime(b) - getJobTime(a))
-      .slice(0, 2);
+      .slice(0, 3);
   }, [active.bookings, upcoming.bookings, history.bookings]);
 
   const weeklyCounts = useMemo(() => {
-    const days = buildLastNDays(7);
+    const days = buildWeekDays();
     const byDay = new Map<string, number>();
     days.forEach((d) => byDay.set(dayKey(d), 0));
 
-    history.bookings.forEach((job) => {
+    // Include all bookings (active, upcoming, and history) in the weekly count
+    const allBookings = [...active.bookings, ...upcoming.bookings, ...history.bookings];
+    allBookings.forEach((job) => {
       const t = Date.parse(job.scheduledTime ?? "");
       if (!Number.isFinite(t)) return;
       const key = dayKey(new Date(t));
@@ -120,7 +144,7 @@ export const HomeDashboardScreen: React.FC = () => {
 
     const max = Math.max(1, ...data.map((x) => x.value));
     return { data, max };
-  }, [history.bookings]);
+  }, [active.bookings, upcoming.bookings, history.bookings]);
 
   const goToRides = (initialType?: JobType) => {
     navigation.navigate("RidesTab", {
@@ -130,7 +154,13 @@ export const HomeDashboardScreen: React.FC = () => {
   };
 
   return (
-    <Screen scrollable contentContainerStyle={styles.container} edges={["top"]}>
+    <Screen
+      scrollable
+      contentContainerStyle={styles.container}
+      edges={["top"]}
+      refreshing={isRefreshing}
+      onRefresh={handleRefresh}
+    >
       <LocationStatusBanner />
 
       <View style={styles.headerRow}>
@@ -159,12 +189,16 @@ export const HomeDashboardScreen: React.FC = () => {
           value={String(stats.totalRides)}
           icon="layers-outline"
           accent={colors.brandGold}
+          colors={colors}
+          styles={styles}
         />
         <StatCard
           title="Earnings"
           value={formatCurrencyMYR(stats.earnings)}
           icon="cash-outline"
           accent={colors.accent}
+          colors={colors}
+          styles={styles}
         />
         <StatCard
           title="Active"
@@ -172,18 +206,22 @@ export const HomeDashboardScreen: React.FC = () => {
           icon="navigate-circle-outline"
           accent={colors.primary}
           onPress={() => goToRides("ACTIVE")}
+          colors={colors}
+          styles={styles}
         />
         <StatCard
           title="Rating"
           value={stats.rating}
           icon="star-outline"
-          accent={colors.textgold}
+          accent={colors.highlight}
+          colors={colors}
+          styles={styles}
         />
       </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Weekly rides</Text>
+          <Text style={styles.sectionTitle}>This week's rides</Text>
           <Pressable onPress={() => goToRides("HISTORY")}>
             <Text style={styles.sectionAction}>View history</Text>
           </Pressable>
@@ -191,19 +229,27 @@ export const HomeDashboardScreen: React.FC = () => {
 
         <View style={styles.chartCard}>
           <View style={styles.chartRow}>
-            {weeklyCounts.data.map((d) => {
+            {weeklyCounts.data.map((d, index) => {
               const heightPct = (d.value / weeklyCounts.max) * 100;
+              const today = new Date();
+              const isToday = index === today.getDay();
               return (
                 <View key={d.label} style={styles.chartCol}>
+                  {d.value > 0 && (
+                    <Text style={styles.chartValue}>{d.value}</Text>
+                  )}
                   <View style={styles.chartBarWrap}>
                     <View
                       style={[
                         styles.chartBar,
-                        { height: `${Math.max(6, heightPct)}%` },
+                        { height: `${Math.max(8, heightPct)}%` },
+                        isToday && styles.chartBarToday,
                       ]}
                     />
                   </View>
-                  <Text style={styles.chartLabel}>{d.label}</Text>
+                  <Text style={[styles.chartLabel, isToday && styles.chartLabelToday]}>
+                    {d.label}
+                  </Text>
                 </View>
               );
             })}
@@ -288,7 +334,9 @@ const StatCard: React.FC<{
   icon: React.ComponentProps<typeof Ionicons>["name"];
   accent: string;
   onPress?: () => void;
-}> = ({ title, value, icon, accent, onPress }) => {
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+}> = ({ title, value, icon, accent, onPress, colors, styles }) => {
   const content = (
     <View style={[styles.statCard, { borderColor: accent }]}>
       <View style={styles.statTop}>
@@ -317,7 +365,7 @@ const StatCard: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     paddingHorizontal: 16,
   },
@@ -366,11 +414,13 @@ const styles = StyleSheet.create({
     marginTop: 14,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    justifyContent: "space-between",
+    rowGap: 12,
   },
   statCard: {
-    width: "48%",
-    backgroundColor: colors.cardbgtransparent,
+    width: "48.5%",
+    minWidth: 150,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
@@ -416,11 +466,11 @@ const styles = StyleSheet.create({
   },
   sectionAction: {
     fontSize: typography.caption,
-    color: colors.textgold,
+    color: colors.highlight,
     fontFamily: typography.fontFamilyMedium,
   },
   chartCard: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
@@ -439,7 +489,7 @@ const styles = StyleSheet.create({
   chartBarWrap: {
     height: 90,
     width: "100%",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: colors.cardSecondary,
     borderRadius: 10,
     overflow: "hidden",
     justifyContent: "flex-end",
@@ -449,13 +499,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brandGold,
     borderRadius: 10,
   },
+  chartBarToday: {
+    backgroundColor: colors.primary,
+  },
+  chartValue: {
+    fontSize: 11,
+    fontFamily: typography.fontFamilyBold,
+    color: colors.text,
+    marginBottom: 4,
+  },
   chartLabel: {
     marginTop: 8,
     fontSize: 10,
     color: colors.muted,
   },
+  chartLabelToday: {
+    color: colors.primary,
+    fontFamily: typography.fontFamilyBold,
+  },
   emptyCard: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
@@ -473,7 +536,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryButtonText: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -481,7 +544,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   recentItem: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
@@ -501,7 +564,7 @@ const styles = StyleSheet.create({
   },
   recentRef: {
     fontSize: typography.caption,
-    color: colors.textgold,
+    color: colors.highlight,
     fontFamily: typography.fontFamilyBold,
   },
   recentRoute: {

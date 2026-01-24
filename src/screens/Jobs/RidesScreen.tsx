@@ -13,7 +13,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { Screen } from "../../components/Screen";
 import { LocationStatusBanner } from "../../components/LocationStatusBanner";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import type { DriverJob, JobType } from "../../api/driver";
 import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
@@ -30,12 +30,12 @@ const FILTERS: Array<{ key: RideFilter; label: string }> = [
   { key: "HISTORY", label: "History" },
 ];
 
-const statusColor = (status?: string) => {
+const getStatusColor = (status: string | undefined, colors: ThemeColors) => {
   switch (status) {
     case "COMPLETED":
-      return "#2E7D32";
+      return colors.success;
     case "CANCELLED":
-      return "#C62828";
+      return colors.danger;
     case "PICKED_UP":
       return colors.primary;
     case "ARRIVED":
@@ -50,6 +50,8 @@ const statusColor = (status?: string) => {
 export const RidesScreen: React.FC<Props> = ({ navigation, route }) => {
   const initialType = route.params?.initialType;
   const [filter, setFilter] = useState<RideFilter>(initialType ?? "ACTIVE");
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { bookings, isLoading, refreshing, refresh } = useRealtimeJobs(filter);
 
@@ -91,7 +93,7 @@ export const RidesScreen: React.FC<Props> = ({ navigation, route }) => {
         <View
           style={[
             styles.statusPill,
-            { borderColor: statusColor(item.status) },
+            { borderColor: getStatusColor(item.status, colors) },
           ]}
         >
           <Text style={styles.statusText}>{item.status}</Text>
@@ -191,7 +193,7 @@ export const RidesScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   list: {
     flex: 1,
   },
@@ -224,7 +226,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: colors.cardSecondary,
     paddingVertical: 10,
     borderRadius: 999,
     alignItems: "center",
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: colors.pagegold,
+    borderBottomColor: colors.border,
   },
   searchInput: {
     flex: 1,
@@ -267,14 +269,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
   },
   clearButtonText: {
     color: colors.muted,
     fontSize: 16,
   },
   card: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardPressed: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.cardSecondary,
     transform: [{ scale: 0.98 }],
   },
   cardHeader: {
@@ -305,7 +307,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: colors.cardSecondary,
   },
   statusText: {
     fontSize: 10,
@@ -342,7 +344,7 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 10,
-    color: colors.textgold,
+    color: colors.highlight,
     fontFamily: typography.fontFamilyMedium,
   },
   tapHint: {

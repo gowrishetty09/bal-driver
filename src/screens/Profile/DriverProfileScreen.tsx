@@ -16,7 +16,7 @@ import { Screen } from "../../components/Screen";
 import { useAuth } from "../../hooks/useAuth";
 import { useLocationService } from "../../hooks/useLocationService";
 import { changeDriverPassword } from "../../api/passwordReset";
-import { colors } from "../../theme/colors";
+import { useTheme } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { getErrorMessage } from "../../utils/errors";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
@@ -77,6 +77,8 @@ const friendlyTime = (timestamp?: string | null) => {
 
 export const DriverProfileScreen: React.FC = () => {
   const { user, logout, updateUserProfile } = useAuth();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation =
     useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const {
@@ -242,7 +244,7 @@ export const DriverProfileScreen: React.FC = () => {
           <View
             style={[
               styles.locationDot,
-              { backgroundColor: locationDisabled ? colors.muted : "#28a745" },
+              { backgroundColor: locationDisabled ? colors.muted : colors.success },
             ]}
           />
           <View style={styles.locationTextColumn}>
@@ -278,6 +280,34 @@ export const DriverProfileScreen: React.FC = () => {
       </View>
 
       {/* Change Password & Logout buttons (kept at end of page, outside a card) */}
+
+      {/* Settings Card */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Settings</Text>
+        <Text style={styles.sectionSubtitle}>
+          Customize your app experience
+        </Text>
+
+        <Pressable
+          style={styles.feedbackButton}
+          onPress={toggleTheme}
+        >
+          <Ionicons 
+            name={isDark ? "sunny-outline" : "moon-outline"} 
+            size={20} 
+            color={colors.brandGold} 
+          />
+          <Text style={styles.feedbackButtonLabel}>
+            {isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={colors.brandGold}
+            style={styles.chevron}
+          />
+        </Pressable>
+      </View>
 
       {/* Feedback & Help Card */}
       <View style={styles.card}>
@@ -316,7 +346,7 @@ export const DriverProfileScreen: React.FC = () => {
           <Ionicons
             name="chevron-forward"
             size={20}
-            color="#fff"
+            color={colors.textInverse}
             style={styles.chevron}
           />
         </Pressable>
@@ -541,224 +571,226 @@ export const DriverProfileScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  card: {
-    backgroundColor: colors.cardbgtransparent,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: typography.body,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  badgesRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-  profileHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  editButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: "transparent",
-  },
-  editButtonText: {
-    color: colors.primary,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: colors.background,
-    color: colors.text,
-    fontSize: typography.caption,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginTop: 12,
-  },
-  locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 6,
-    marginRight: 10,
-  },
-  locationTextColumn: {
-    flex: 1,
-  },
-  statusRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  statusButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  statusButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  statusButtonText: {
-    color: colors.muted,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  statusButtonTextActive: {
-    color: "#fff",
-  },
-  sectionTitle: {
-    fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyMedium,
-    color: colors.text,
-  },
-  sectionSubtitle: {
-    fontSize: typography.body,
-    color: colors.muted,
-    marginTop: 6,
-  },
-  metaText: {
-    fontSize: typography.caption,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  secondaryButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.brandNavy,
-    alignItems: "center",
-  },
-  secondaryButtonLabel: {
-    color: colors.brandNavy,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  logoutButton: {
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: colors.danger,
-    alignItems: "center",
-  },
-  logoutLabel: {
-    color: "#fff",
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  feedbackButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: colors.brandNavy,
-    gap: 12,
-  },
-  feedbackButtonLabel: {
-    flex: 1,
-    color: colors.brandGold,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  reportIssueLabel: {
-    color: "#fff",
-  },
-  chevron: {
-    marginLeft: "auto",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: typography.body,
-    color: colors.text,
-    marginBottom: 12,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-  },
-  modalCancelText: {
-    color: colors.muted,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  modalSubmitButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-  },
-  modalSubmitText: {
-    color: "#fff",
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-});
+const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
+  StyleSheet.create({
+    content: {
+      padding: 16,
+      paddingBottom: 32,
+    },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: typography.heading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+    },
+    subtitle: {
+      fontSize: typography.body,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    badgesRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 12,
+    },
+    profileHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    editButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: "transparent",
+    },
+    editButtonText: {
+      color: colors.primary,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    badge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: colors.background,
+      color: colors.text,
+      fontSize: typography.caption,
+    },
+    locationRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      marginTop: 12,
+    },
+    locationDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      marginTop: 6,
+      marginRight: 10,
+    },
+    locationTextColumn: {
+      flex: 1,
+    },
+    statusRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    statusButton: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      backgroundColor: "transparent",
+    },
+    statusButtonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    statusButtonText: {
+      color: colors.muted,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    statusButtonTextActive: {
+      color: colors.textInverse,
+    },
+    sectionTitle: {
+      fontSize: typography.subheading,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.text,
+    },
+    sectionSubtitle: {
+      fontSize: typography.body,
+      color: colors.muted,
+      marginTop: 6,
+    },
+    metaText: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    secondaryButton: {
+      marginTop: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      alignItems: "center",
+    },
+    secondaryButtonLabel: {
+      color: colors.primary,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    logoutButton: {
+      marginTop: 16,
+      paddingVertical: 14,
+      borderRadius: 12,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+    },
+    logoutLabel: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    feedbackButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 16,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: colors.brandNavy,
+      gap: 12,
+    },
+    feedbackButtonLabel: {
+      flex: 1,
+      color: colors.brandGold,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    reportIssueLabel: {
+      color: colors.textInverse,
+    },
+    chevron: {
+      marginLeft: "auto",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+      width: "100%",
+      maxWidth: 400,
+    },
+    modalTitle: {
+      fontSize: typography.heading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+      marginBottom: 20,
+      textAlign: "center",
+    },
+    modalInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: typography.body,
+      color: colors.text,
+      backgroundColor: colors.inputBackground,
+      marginBottom: 12,
+    },
+    modalActions: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 8,
+    },
+    modalCancelButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+    },
+    modalCancelText: {
+      color: colors.muted,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    modalSubmitButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+    },
+    modalSubmitText: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+  });

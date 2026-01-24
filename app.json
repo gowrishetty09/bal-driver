@@ -13,9 +13,9 @@
       "color": "#151e2d"
     },
     "splash": {
-      "image": "./assets/horizantal-logo.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#151e2d"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,

@@ -19,7 +19,7 @@ import { Screen } from "../../components/Screen";
 import { FeedbackPrompt } from "../../components/FeedbackPrompt";
 import { RideMapView } from "../../components/RideMapView";
 import { useLocationService } from "../../hooks/useLocationService";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import {
   RidesStackParamList,
@@ -96,6 +96,8 @@ type Props = NativeStackScreenProps<RidesStackParamList, "JobDetails">;
 export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const { jobId } = route.params ?? {};
   const rootNavigation = useNavigation<any>();
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [job, setJob] = useState<DriverJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -1522,7 +1524,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
     backgroundColor: colors.background,
@@ -1537,7 +1539,7 @@ const styles = StyleSheet.create({
   },
   detailsPanel: {
     flex: 1,
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: -16,
@@ -1553,7 +1555,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.mapOverlay,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -1579,7 +1581,7 @@ const styles = StyleSheet.create({
   },
   closeFullscreenButtonText: {
     fontSize: 24,
-    color: "#fff",
+    color: colors.textInverse,
     fontWeight: "bold",
   },
   fullscreenNavigateContainer: {
@@ -1616,7 +1618,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#25D366",
   },
   locationDetailsCard: {
-    backgroundColor: colors.pagenavy,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -1659,7 +1661,7 @@ const styles = StyleSheet.create({
   locationConnector: {
     width: 2,
     height: 20,
-    backgroundColor: colors.pagenavy,
+    backgroundColor: colors.border,
     marginLeft: 5,
     marginVertical: 4,
   },
@@ -1689,7 +1691,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 16,
@@ -1709,7 +1711,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   navigateOverlayButtonText: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -1795,7 +1797,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   overlayPrimaryActionLabel: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -1854,11 +1856,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   statusChipText: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.caption,
   },
   section: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
@@ -2011,7 +2013,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   primaryActionLabel: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
   },
@@ -2044,7 +2046,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
   },

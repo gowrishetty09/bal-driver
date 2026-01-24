@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Screen } from '../../components/Screen';
 import { StarRating } from '../../components/StarRating';
-import { colors } from '../../theme/colors';
+import { useTheme, ThemeColors } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { FeedbackStackParamList } from '../../types/navigation';
 import { FeedbackCategory } from '../../api/feedback';
@@ -65,6 +65,8 @@ const categoryOptions: CategoryOption[] = [
 type Props = NativeStackScreenProps<FeedbackStackParamList, 'Feedback'>;
 
 export const FeedbackScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { submit, isSubmitting, pendingFeedback } = useFeedbackStore();
   
   // Pre-select category if provided (e.g., from Report Issue)
@@ -281,7 +283,7 @@ export const FeedbackScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     padding: 16,
     paddingBottom: 40,
@@ -327,7 +329,7 @@ const styles = StyleSheet.create({
   ratingContainer: {
     alignItems: 'center',
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
@@ -350,7 +352,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
   },
   categoryChipSelected: {
     backgroundColor: colors.brandNavy,
@@ -389,7 +391,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: typography.body,
     color: colors.text,
-    backgroundColor: '#fff',
+    backgroundColor: colors.inputBackground,
   },
   submitButton: {
     flexDirection: 'row',
@@ -448,7 +450,7 @@ const styles = StyleSheet.create({
   tipsContainer: {
     marginTop: 24,
     padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
   },
   tipsTitle: {

@@ -13,7 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { Screen } from "../../components/Screen";
 import { LocationStatusBanner } from "../../components/LocationStatusBanner";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { ActiveJobsStackParamList } from "../../types/navigation";
 import { DriverJob } from "../../api/driver";
@@ -22,6 +22,8 @@ import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
 type Props = NativeStackScreenProps<ActiveJobsStackParamList, "ActiveJobs">;
 
 export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const {
     bookings: jobs,
     isLoading,
@@ -96,7 +98,7 @@ export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   list: {
     flex: 1,
   },
@@ -118,7 +120,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   card: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -131,7 +133,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardPressed: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundSecondary,
     transform: [{ scale: 0.98 }],
   },
   cardHeader: {
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusBadgeText: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.caption,
     fontFamily: typography.fontFamilyMedium,
   },

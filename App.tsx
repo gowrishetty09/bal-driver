@@ -8,6 +8,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { LocationProvider } from './src/context/LocationContext';
 import { SosProvider } from './src/context/SosContext';
 import { NotificationProvider } from './src/context/NotificationContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useFeedbackSync } from './src/hooks/useFeedbackSync';
 
@@ -20,17 +21,19 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <NotificationProvider>
-            <LocationProvider>
-              <SosProvider>
-                <FeedbackSyncProvider>
-                  <AppNavigator />
-                </FeedbackSyncProvider>
-              </SosProvider>
-            </LocationProvider>
-          </NotificationProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <LocationProvider>
+                <SosProvider>
+                  <FeedbackSyncProvider>
+                    <AppNavigator />
+                  </FeedbackSyncProvider>
+                </SosProvider>
+              </LocationProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </ThemeProvider>
         <Toast />
       </SafeAreaProvider>
     </GestureHandlerRootView>

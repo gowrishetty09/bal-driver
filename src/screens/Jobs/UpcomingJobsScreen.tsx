@@ -13,7 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import { Screen } from "../../components/Screen";
 import { LocationStatusBanner } from "../../components/LocationStatusBanner";
-import { colors } from "../../theme/colors";
+import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { UpcomingJobsStackParamList } from "../../types/navigation";
 import { DriverJob } from "../../api/driver";
@@ -22,6 +22,8 @@ import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
 type Props = NativeStackScreenProps<UpcomingJobsStackParamList, "UpcomingJobs">;
 
 export const UpcomingJobsScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const {
     bookings: jobs,
     isLoading: loading,
@@ -88,7 +90,7 @@ export const UpcomingJobsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   list: {
     flex: 1,
   },
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: colors.cardbgtransparent,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,

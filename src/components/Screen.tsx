@@ -1,35 +1,46 @@
 import React from "react";
-import { ScrollView, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { RefreshControl, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 
-import { colors } from "../theme/colors";
+import { useTheme } from "../context/ThemeContext";
 
 export type ScreenProps = {
   children: React.ReactNode;
   scrollable?: boolean;
   contentContainerStyle?: StyleProp<ViewStyle>;
   edges?: ("top" | "bottom" | "left" | "right")[];
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
-
-const gradientTop = colors.pagenavy ?? colors.brandNavy ?? "#151e2d";
-const gradientBottom = colors.pagegold ?? "rgba(189, 146, 80, 0.15)";
-const gradientColors: [string, string] = [gradientTop, gradientBottom];
 
 export const Screen: React.FC<ScreenProps> = ({
   children,
   scrollable,
   contentContainerStyle,
   edges = [],
+  refreshing,
+  onRefresh,
 }) => {
+  const { colors } = useTheme();
+
   return (
-    <LinearGradient colors={gradientColors} style={styles.gradient}>
+    <View style={[styles.gradient, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.container} edges={edges}>
         {scrollable ? (
           <ScrollView
             contentContainerStyle={[styles.content, contentContainerStyle]}
             style={styles.container}
             contentInsetAdjustmentBehavior="never"
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={refreshing ?? false}
+                  onRefresh={onRefresh}
+                  colors={[colors.primary]}
+                  tintColor={colors.primary}
+                />
+              ) : undefined
+            }
           >
             {children}
           </ScrollView>
@@ -37,7 +48,7 @@ export const Screen: React.FC<ScreenProps> = ({
           <>{children}</>
         )}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
