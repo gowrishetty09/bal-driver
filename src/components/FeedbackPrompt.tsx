@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  FlatList,
   Modal,
   Pressable,
   StyleSheet,
@@ -11,14 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { StarRating } from './StarRating';
 import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
-import { useFeedbackStore } from '../store/feedbackStore';
-import { showErrorToast, showSuccessToast } from '../utils/toast';
-import { getErrorMessage } from '../utils/errors';
+import { DriverJob, getDriverJobs } from '../api/driver';
 
-const AUTO_DISMISS_TIMEOUT = 30000; // 30 seconds
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export type FeedbackPromptProps = {
@@ -26,22 +23,25 @@ export type FeedbackPromptProps = {
   onClose: () => void;
   bookingId?: string;
   title?: string;
+  onNavigateToJob?: (jobId: string) => void;
+  onNavigateHome?: () => void;
 };
 
 export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
   visible,
   onClose,
   bookingId,
-  title = 'How was this trip?',
+  title = 'Ride Completed Successfully!',
+  onNavigateToJob,
+  onNavigateHome,
 }) => {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { submit, isSubmitting } = useFeedbackStore();
-  const [rating, setRating] = useState(0);
+  const [upcomingRides, setUpcomingRides] = useState<DriverJob[]>([]);
+  const [loading, setLoading] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const autoDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Animate in/out
+  // Fetch upcoming rides when visible
   useEffect(() => {
     if (visible) {
       Animated.spring(slideAnim, {
@@ -51,10 +51,20 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
         friction: 9,
       }).start();
 
-      // Set auto-dismiss timer
-      autoDismissTimer.current = setTimeout(() => {
-        handleClose();
-      }, AUTO_DISMISS_TIMEOUT);
+      // Fetch upcoming rides
+      const fetchUpcomingRides = async () => {
+        setLoading(true);
+        try {
+          const rides = await getDriverJobs('UPCOMING');
+          setUpcomingRides(rides);
+        } catch (error) {
+          console.warn('Unable to fetch upcoming rides', error);
+          setUpcomingRides([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchUpcomingRides();
     } else {
       Animated.timing(slideAnim, {
         toValue: SCREEN_HEIGHT,
@@ -62,58 +72,60 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
         useNativeDriver: true,
       }).start();
     }
-
-    return () => {
-      if (autoDismissTimer.current) {
-        clearTimeout(autoDismissTimer.current);
-      }
-    };
   }, [visible]);
 
   const handleClose = useCallback(() => {
-    if (autoDismissTimer.current) {
-      clearTimeout(autoDismissTimer.current);
-    }
-    setRating(0);
     onClose();
   }, [onClose]);
 
-  const handleSubmit = useCallback(async () => {
-    if (rating < 1) {
-      return;
+  const handleOkay = useCallback(() => {
+    onClose();
+    if (onNavigateHome) {
+      onNavigateHome();
     }
+  }, [onClose, onNavigateHome]);
 
-    // Clear auto-dismiss timer on interaction
-    if (autoDismissTimer.current) {
-      clearTimeout(autoDismissTimer.current);
+  const handleRidePress = useCallback((jobId: string) => {
+    onClose();
+    if (onNavigateToJob) {
+      onNavigateToJob(jobId);
     }
+  }, [onClose, onNavigateToJob]);
 
-    try {
-      const response = await submit({
-        rating,
-        bookingId,
-        category: 'BOOKING_PROCESS',
-      });
-
-      if (response) {
-        showSuccessToast('Thank you!', 'Your feedback helps us improve');
-      } else {
-        showSuccessToast('Saved', 'Will sync when online');
-      }
-      handleClose();
-    } catch (error) {
-      const message = getErrorMessage(error, 'Unable to submit');
-      showErrorToast('Feedback', message);
-    }
-  }, [rating, bookingId, submit, handleClose]);
-
-  const handleRatingChange = useCallback((newRating: number) => {
-    // Clear auto-dismiss on interaction
-    if (autoDismissTimer.current) {
-      clearTimeout(autoDismissTimer.current);
-    }
-    setRating(newRating);
+  const formatDateTime = useCallback((dateString: string) => {
+    const date = new Date(dateString);
+    const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return `${day} at ${time}`;
   }, []);
+
+  const renderRideItem = useCallback(({ item }: { item: DriverJob }) => (
+    <Pressable
+      style={styles.rideItem}
+      onPress={() => handleRidePress(item.id)}
+    >
+      <View style={styles.rideItemLeft}>
+        <Ionicons name="car-outline" size={24} color={colors.brandNavy} />
+      </View>
+      <View style={styles.rideItemContent}>
+        <Text style={styles.rideReference}>#{item.reference}</Text>
+        <Text style={styles.ridePassenger}>{item.passengerName}</Text>
+        <Text style={styles.rideTime}>
+          <Ionicons name="time-outline" size={14} color={colors.muted} />{' '}
+          {formatDateTime(item.scheduledTime)}
+        </Text>
+        {item.pickup?.addressLine && (
+          <Text style={styles.rideAddress} numberOfLines={1}>
+            <Ionicons name="location-outline" size={14} color={colors.muted} />{' '}
+            {item.pickup.addressLine}
+          </Text>
+        )}
+      </View>
+      <View style={styles.rideItemRight}>
+        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+      </View>
+    </Pressable>
+  ), [colors, styles, handleRidePress, formatDateTime]);
 
   if (!visible) {
     return null;
@@ -139,67 +151,43 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
           {/* Handle bar */}
           <View style={styles.handleBar} />
 
-          {/* Close button */}
-          <Pressable
-            style={styles.closeButton}
-            onPress={handleClose}
-            hitSlop={12}
-          >
-            <Ionicons name="close" size={24} color={colors.muted} />
-          </Pressable>
+          {/* Success Icon */}
+          <View style={styles.successIcon}>
+            <Ionicons name="checkmark-circle" size={64} color={colors.success} />
+          </View>
 
           {/* Content */}
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>
-            Rate your experience with this booking
+            Great job! Your ride has been completed successfully.
           </Text>
 
-          <View style={styles.ratingSection}>
-            <StarRating
-              rating={rating}
-              onRatingChange={handleRatingChange}
-              size={44}
-            />
-            {rating > 0 && (
-              <Text style={styles.ratingText}>
-                {rating === 1 && 'Poor'}
-                {rating === 2 && 'Fair'}
-                {rating === 3 && 'Good'}
-                {rating === 4 && 'Very Good'}
-                {rating === 5 && 'Excellent'}
-              </Text>
+          {/* Upcoming Rides Section */}
+          <View style={styles.upcomingSection}>
+            <Text style={styles.upcomingTitle}>Upcoming Rides</Text>
+            {loading ? (
+              <ActivityIndicator color={colors.brandNavy} style={styles.loader} />
+            ) : upcomingRides.length > 0 ? (
+              <FlatList
+                data={upcomingRides.slice(0, 5)}
+                keyExtractor={(item) => item.id}
+                renderItem={renderRideItem}
+                style={styles.ridesList}
+                scrollEnabled={upcomingRides.length > 3}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.noRidesContainer}>
+                <Ionicons name="calendar-outline" size={32} color={colors.muted} />
+                <Text style={styles.noRidesText}>No upcoming rides scheduled</Text>
+              </View>
             )}
           </View>
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            <Pressable
-              style={styles.skipButton}
-              onPress={handleClose}
-              disabled={isSubmitting}
-            >
-              <Text style={styles.skipLabel}>Skip</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.submitButton,
-                (rating < 1 || isSubmitting) && styles.submitDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={rating < 1 || isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.brandGold} size="small" />
-              ) : (
-                <Text style={styles.submitLabel}>Submit</Text>
-              )}
-            </Pressable>
-          </View>
-
-          {/* Auto-dismiss hint */}
-          <Text style={styles.autoDismissHint}>
-            This will close automatically in 30 seconds
-          </Text>
+          {/* Okay Button */}
+          <Pressable style={styles.okayButton} onPress={handleOkay}>
+            <Text style={styles.okayLabel}>Okay</Text>
+          </Pressable>
         </Animated.View>
       </View>
     </Modal>
@@ -222,6 +210,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 12,
     paddingHorizontal: 24,
     paddingBottom: 40,
+    maxHeight: SCREEN_HEIGHT * 0.8,
   },
   handleBar: {
     width: 40,
@@ -231,70 +220,104 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 16,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 4,
+  successIcon: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
   },
   title: {
     fontSize: typography.heading,
     fontFamily: typography.fontFamilyBold,
     color: colors.text,
     textAlign: 'center',
-    marginTop: 8,
   },
   subtitle: {
     fontSize: typography.body,
     color: colors.muted,
     textAlign: 'center',
     marginTop: 8,
+    marginBottom: 16,
   },
-  ratingSection: {
-    alignItems: 'center',
+  upcomingSection: {
+    marginVertical: 16,
+  },
+  upcomingTitle: {
+    fontSize: typography.body,
+    fontFamily: typography.fontFamilyMedium,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  loader: {
     marginVertical: 24,
   },
-  ratingText: {
-    marginTop: 12,
-    fontSize: typography.body,
-    color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+  ridesList: {
+    maxHeight: 240,
   },
-  actions: {
+  rideItem: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  skipButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
   },
-  skipLabel: {
+  rideItemLeft: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rideItemContent: {
+    flex: 1,
+  },
+  rideReference: {
+    fontSize: typography.caption,
+    color: colors.brandNavy,
+    fontFamily: typography.fontFamilyMedium,
+  },
+  ridePassenger: {
+    fontSize: typography.body,
+    color: colors.text,
+    fontFamily: typography.fontFamilyMedium,
+    marginTop: 2,
+  },
+  rideTime: {
+    fontSize: typography.caption,
+    color: colors.muted,
+    marginTop: 4,
+  },
+  rideAddress: {
+    fontSize: typography.caption,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  rideItemRight: {
+    marginLeft: 8,
+  },
+  noRidesContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  noRidesText: {
     fontSize: typography.body,
     color: colors.muted,
+    marginTop: 8,
   },
-  submitButton: {
-    flex: 1,
+  okayButton: {
     paddingVertical: 16,
     borderRadius: 16,
     backgroundColor: colors.brandNavy,
     alignItems: 'center',
+    marginTop: 8,
   },
-  submitDisabled: {
-    opacity: 0.5,
-  },
-  submitLabel: {
+  okayLabel: {
     fontSize: typography.body,
     fontFamily: typography.fontFamilyMedium,
     color: colors.brandGold,
-  },
-  autoDismissHint: {
-    marginTop: 16,
-    fontSize: typography.caption,
-    color: colors.muted,
-    textAlign: 'center',
   },
 });

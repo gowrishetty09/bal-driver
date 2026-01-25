@@ -597,12 +597,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         {
           text: "Yes, received",
           onPress: async () => {
-            // Use reason to indicate cash received; backend may record payment when completing
-            await performStatusUpdate("COMPLETED", "CASH_PAID");
-            // Ensure UI reflects payment status
-            setJob((prev) =>
-              prev ? { ...prev, paymentStatus: "PAID" } : prev
-            );
+            try {
+              // Use reason to indicate cash received; backend will record payment when completing
+              await performStatusUpdate("COMPLETED", "CASH_PAID");
+              // performStatusUpdate already handles success/error toasts and job update
+            } catch {
+              // Error already handled in performStatusUpdate
+            }
           },
         },
       ]
@@ -1513,12 +1514,24 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         </View>
       </Modal>
 
-      {/* Feedback Prompt - shown after completing a trip */}
+      {/* Ride Completion Prompt - shown after completing a trip */}
       <FeedbackPrompt
         visible={showFeedbackPrompt}
         onClose={() => setShowFeedbackPrompt(false)}
         bookingId={job?.id}
-        title="How was this trip?"
+        title="Ride Completed Successfully!"
+        onNavigateToJob={(jobId) => {
+          rootNavigation.navigate('RidesTab', {
+            screen: 'Rides',
+            params: {
+              screen: 'JobDetails',
+              params: { jobId },
+            },
+          });
+        }}
+        onNavigateHome={() => {
+          rootNavigation.navigate('HomeTab');
+        }}
       />
     </Screen>
   );
