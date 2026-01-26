@@ -11,6 +11,7 @@ import { NotificationProvider } from './src/context/NotificationContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useFeedbackSync } from './src/hooks/useFeedbackSync';
+import { NetworkStatusModal } from './src/components/NetworkStatusModal';
 
 const FeedbackSyncProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   useFeedbackSync();
@@ -28,6 +29,7 @@ export default function App() {
                 <SosProvider>
                   <FeedbackSyncProvider>
                     <AppNavigator />
+                    <NetworkStatusModal />
                   </FeedbackSyncProvider>
                 </SosProvider>
               </LocationProvider>

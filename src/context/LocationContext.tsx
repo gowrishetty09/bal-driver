@@ -17,6 +17,7 @@ export type LocationContextValue = {
   setHighFrequencyMode: (enabled: boolean) => void;
   isHighFrequencyMode: boolean;
   setActiveBookingId: (bookingId: string | null) => void;
+  refreshLocation: () => Promise<{ latitude: number; longitude: number } | null>;
 };
 
 export const LocationContext = createContext<LocationContextValue | null>(null);
@@ -202,6 +203,27 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     [stopInterval]
   );
 
+  // Force refresh location immediately (useful for proximity checks)
+  const refreshLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
+    if (permissionStatus !== 'granted') {
+      return null;
+    }
+    try {
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const coords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      setLastKnownCoordinates(coords);
+      return coords;
+    } catch (error) {
+      console.warn('Failed to refresh location:', error);
+      return null;
+    }
+  }, [permissionStatus]);
+
   const value = useMemo(
     () => ({
       permissionStatus,
@@ -212,8 +234,9 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       setHighFrequencyMode,
       isHighFrequencyMode,
       setActiveBookingId,
+      refreshLocation,
     }),
-    [permissionStatus, isSharingLocation, lastSentAt, lastKnownCoordinates, requestPermission, setHighFrequencyMode, isHighFrequencyMode, setActiveBookingId]
+    [permissionStatus, isSharingLocation, lastSentAt, lastKnownCoordinates, requestPermission, setHighFrequencyMode, isHighFrequencyMode, setActiveBookingId, refreshLocation]
   );
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;

@@ -126,6 +126,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     isHighFrequencyMode,
     lastKnownCoordinates,
     setActiveBookingId,
+    refreshLocation,
   } = useLocationService();
 
   // Determine if map should be shown (active ride statuses only)
@@ -494,11 +495,30 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
       // Validate proximity for marking as ARRIVED
       if (nextStatus === "ARRIVED") {
-        if (pickupProximity.canVerify && !pickupProximity.isNear) {
+        // Try to refresh location before proximity check
+        let currentProximity = pickupProximity;
+        if (!pickupProximity.canVerify && permissionStatus === "granted") {
+          const freshCoords = await refreshLocation();
+          if (freshCoords && job.pickupCoords) {
+            const distance = calculateDistance(
+              freshCoords.latitude,
+              freshCoords.longitude,
+              Number(job.pickupCoords.lat),
+              Number(job.pickupCoords.lng)
+            );
+            currentProximity = {
+              canVerify: true,
+              distanceMeters: distance,
+              isNear: distance <= PICKUP_PROXIMITY_THRESHOLD_METERS,
+            };
+          }
+        }
+
+        if (currentProximity.canVerify && !currentProximity.isNear) {
           const distanceText =
-            typeof pickupProximity.distanceMeters === "number"
+            typeof currentProximity.distanceMeters === "number"
               ? ` (currently ~${Math.round(
-                  pickupProximity.distanceMeters
+                  currentProximity.distanceMeters
                 )}m away)`
               : "";
           Alert.alert(
@@ -510,7 +530,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         }
 
         // If we cannot verify (missing pickup coords or location), allow with confirmation.
-        if (!pickupProximity.canVerify) {
+        if (!currentProximity.canVerify) {
           if (permissionStatus !== "granted") {
             Alert.alert(
               "Location Permission Needed",
@@ -552,6 +572,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       pickupProximity,
       permissionStatus,
       requestPermission,
+      refreshLocation,
     ]
   );
 
