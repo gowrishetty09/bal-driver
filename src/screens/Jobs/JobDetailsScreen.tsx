@@ -21,9 +21,7 @@ import { RideMapView } from "../../components/RideMapView";
 import { useLocationService } from "../../hooks/useLocationService";
 import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
-import {
-  RidesStackParamList,
-} from "../../types/navigation";
+import { RidesStackParamList } from "../../types/navigation";
 import {
   DriverJob,
   DriverJobDetail,
@@ -56,7 +54,7 @@ const calculateDistance = (
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number
+  lon2: number,
 ): number => {
   const R = 6371e3; // Earth's radius in meters
   const φ1 = (lat1 * Math.PI) / 180;
@@ -79,6 +77,7 @@ const STATUS_LABELS: Record<JobStatus, string> = {
   PICKED_UP: "Picked up",
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
+  NO_SHOW: "No Show",
 };
 
 const STATUS_TRANSITIONS: Partial<Record<JobStatus, JobStatus>> = {
@@ -88,7 +87,7 @@ const STATUS_TRANSITIONS: Partial<Record<JobStatus, JobStatus>> = {
   PICKED_UP: "COMPLETED",
 };
 
-const TERMINAL_STATUSES: JobStatus[] = ["COMPLETED", "CANCELLED"];
+const TERMINAL_STATUSES: JobStatus[] = ["COMPLETED", "CANCELLED", "NO_SHOW"];
 const ACTIVE_RIDE_STATUSES: JobStatus[] = ["EN_ROUTE", "ARRIVED", "PICKED_UP"];
 
 type Props = NativeStackScreenProps<RidesStackParamList, "JobDetails">;
@@ -103,6 +102,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [noShowModalVisible, setNoShowModalVisible] = useState(false);
+  const [noShowReason, setNoShowReason] = useState("");
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [hasInProgressRide, setHasInProgressRide] = useState(false);
@@ -166,7 +167,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         driverLat,
         driverLng,
         pickupLat,
-        pickupLng
+        pickupLng,
       );
       if (!Number.isFinite(distance)) {
         return {
@@ -201,7 +202,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       const activeJobs = await getDriverJobs("ACTIVE");
       const inProgressJob = activeJobs.find(
         (j: DriverJob) =>
-          ACTIVE_RIDE_STATUSES.includes(j.status) && j.id !== jobId
+          ACTIVE_RIDE_STATUSES.includes(j.status) && j.id !== jobId,
       );
       setHasInProgressRide(!!inProgressJob);
       setInProgressRideId(inProgressJob?.id ?? null);
@@ -232,10 +233,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               latitude: lastKnownCoordinates.latitude,
               longitude: lastKnownCoordinates.longitude,
             }
-          : undefined
+          : undefined,
       );
     },
-    [lastKnownCoordinates]
+    [lastKnownCoordinates],
   );
 
   const fetchDetails = useCallback(async () => {
@@ -283,13 +284,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           setAwaitingRideStartConfirmation(false);
           showErrorToast(
             "Ride start",
-            "No confirmation received. Please try again."
+            "No confirmation received. Please try again.",
           );
         } catch (error) {
           setAwaitingRideStartConfirmation(false);
           const message = getErrorMessage(
             error,
-            "Failed to refresh ride status"
+            "Failed to refresh ride status",
           );
           showErrorToast("Ride start", message);
         }
@@ -417,7 +418,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         Alert.alert(
           "Ride In Progress",
           "You have another ride in progress. Please complete or cancel that ride first.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         );
         return;
       }
@@ -427,7 +428,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         const updatedJob = await updateDriverJobStatus(
           job.id,
           nextStatus,
-          reason
+          reason,
         );
         // Merge updated job with existing job data to preserve fields like coordinates
         // that may not be returned by the status update endpoint
@@ -443,7 +444,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         emitJobRefresh();
         showSuccessToast(
           "Status updated",
-          `Ride marked as ${STATUS_LABELS[nextStatus]}`
+          `Ride marked as ${STATUS_LABELS[nextStatus]}`,
         );
 
         // Notify admin and customer when driver marks as arrived
@@ -451,7 +452,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           notifyArrival(job.id, "arrived");
           showInfoToast(
             "Notification sent",
-            "Admin and customer have been notified of your arrival"
+            "Admin and customer have been notified of your arrival",
           );
         }
 
@@ -474,7 +475,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         setAwaitingRideStartConfirmation(false);
       }
     },
-    [job, hasInProgressRide, notifyArrival, checkForInProgressRides]
+    [job, hasInProgressRide, notifyArrival, checkForInProgressRides],
   );
 
   const handleStatusUpdate = useCallback(
@@ -488,7 +489,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         Alert.alert(
           "Ride In Progress",
           "You have another ride in progress. Please complete or cancel that ride first.",
-          [{ text: "OK" }]
+          [{ text: "OK" }],
         );
         return;
       }
@@ -504,7 +505,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               freshCoords.latitude,
               freshCoords.longitude,
               Number(job.pickupCoords.lat),
-              Number(job.pickupCoords.lng)
+              Number(job.pickupCoords.lng),
             );
             currentProximity = {
               canVerify: true,
@@ -518,13 +519,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           const distanceText =
             typeof currentProximity.distanceMeters === "number"
               ? ` (currently ~${Math.round(
-                  currentProximity.distanceMeters
+                  currentProximity.distanceMeters,
                 )}m away)`
               : "";
           Alert.alert(
             "Not at Pickup Location",
             `You need to be within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m of the pickup location to mark as arrived.${distanceText}`,
-            [{ text: "OK" }]
+            [{ text: "OK" }],
           );
           return;
         }
@@ -543,7 +544,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     requestPermission().catch(() => undefined);
                   },
                 },
-              ]
+              ],
             );
             return;
           }
@@ -557,7 +558,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 text: "Mark arrived",
                 onPress: () => void performStatusUpdate(nextStatus, reason),
               },
-            ]
+            ],
           );
           return;
         }
@@ -573,10 +574,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       permissionStatus,
       requestPermission,
       refreshLocation,
-    ]
+    ],
   );
 
-  const nextStatus = job ? STATUS_TRANSITIONS[job.status] ?? null : null;
+  const nextStatus = job ? (STATUS_TRANSITIONS[job.status] ?? null) : null;
   const isJobTerminal = job ? TERMINAL_STATUSES.includes(job.status) : false;
 
   const paymentMethodNormalized = useMemo(() => {
@@ -627,7 +628,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             }
           },
         },
-      ]
+      ],
     );
   }, [job, performStatusUpdate]);
 
@@ -637,7 +638,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       return;
     }
     Linking.openURL(`tel:${job.passengerPhone}`).catch(() =>
-      Alert.alert("Dial failed", "Unable to initiate a call on this device.")
+      Alert.alert("Dial failed", "Unable to initiate a call on this device."),
     );
   }, [job]);
 
@@ -655,8 +656,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     Linking.openURL(url).catch(() =>
       Alert.alert(
         "WhatsApp unavailable",
-        "Install WhatsApp or try calling the customer instead."
-      )
+        "Install WhatsApp or try calling the customer instead.",
+      ),
     );
   }, [job]);
 
@@ -664,12 +665,23 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     if (!cancelReason.trim()) {
       Alert.alert(
         "Reason required",
-        "Please provide a reason to cancel this ride."
+        "Please provide a reason to cancel this ride.",
       );
       return;
     }
     handleStatusUpdate("CANCELLED", cancelReason.trim());
   }, [cancelReason, handleStatusUpdate]);
+
+  const confirmNoShow = useCallback(() => {
+    if (!noShowReason.trim()) {
+      Alert.alert(
+        "Reason required",
+        "Please provide a reason for marking as No Show.",
+      );
+      return;
+    }
+    handleStatusUpdate("NO_SHOW" as JobStatus, noShowReason.trim());
+  }, [noShowReason, handleStatusUpdate]);
 
   const formatDateTime = useCallback((value?: string) => {
     if (!value) {
@@ -770,17 +782,17 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                         label: "Drop-off",
                       }
                     : job.pickupCoords
-                    ? {
-                        lat: job.pickupCoords.lat,
-                        lng: job.pickupCoords.lng,
-                        label: "Pickup",
-                      }
-                    : null;
+                      ? {
+                          lat: job.pickupCoords.lat,
+                          lng: job.pickupCoords.lng,
+                          label: "Pickup",
+                        }
+                      : null;
                 if (destination) {
                   const url = `google.navigation:q=${destination.lat},${destination.lng}`;
                   Linking.openURL(url).catch(() => {
                     Linking.openURL(
-                      `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`
+                      `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`,
                     );
                   });
                 }
@@ -966,11 +978,11 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                         : ""
                     }`
                   : pickupProximity.canVerify &&
-                    typeof pickupProximity.distanceMeters === "number"
-                  ? `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m) • ~${Math.round(
-                      pickupProximity.distanceMeters
-                    )}m away`
-                  : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`}
+                      typeof pickupProximity.distanceMeters === "number"
+                    ? `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m) • ~${Math.round(
+                        pickupProximity.distanceMeters,
+                      )}m away`
+                    : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`}
               </Text>
             </View>
           )}
@@ -991,10 +1003,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     setPickupCodeModalVisible(true);
                     return;
                   }
-                  if (
-                    nextStatus === "COMPLETED" &&
-                    needsCashConfirmation
-                  ) {
+                  if (nextStatus === "COMPLETED" && needsCashConfirmation) {
                     confirmCashAndComplete();
                   } else {
                     handleStatusUpdate(nextStatus);
@@ -1029,12 +1038,20 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 )}
               </Pressable>
             )}
-            <Pressable
-              style={styles.overlayCancelAction}
-              onPress={() => setCancelModalVisible(true)}
-            >
-              <Text style={styles.overlayCancelActionLabel}>Cancel</Text>
-            </Pressable>
+            <View style={styles.overlaySecondaryActions}>
+              <Pressable
+                style={styles.overlayNoShowAction}
+                onPress={() => setNoShowModalVisible(true)}
+              >
+                <Text style={styles.overlayNoShowActionLabel}>No Show</Text>
+              </Pressable>
+              <Pressable
+                style={styles.overlayCancelAction}
+                onPress={() => setCancelModalVisible(true)}
+              >
+                <Text style={styles.overlayCancelActionLabel}>Cancel</Text>
+              </Pressable>
+            </View>
           </View>
         </ScrollView>
 
@@ -1094,7 +1111,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     if (!/^\d{6}$/.test(normalizedCode)) {
                       Alert.alert(
                         "Invalid code",
-                        `Please enter the ${PICKUP_CODE_LENGTH}-digit pickup code to start the ride.`
+                        `Please enter the ${PICKUP_CODE_LENGTH}-digit pickup code to start the ride.`,
                       );
                       return;
                     }
@@ -1106,14 +1123,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                       try {
                         const result = await verifyPickupCode(
                           job.id,
-                          normalizedCode
+                          normalizedCode,
                         );
 
                         if (result.ok) {
                           setAwaitingRideStartConfirmation(true);
                           showInfoToast(
                             "Pickup code verified",
-                            "Waiting for ride start confirmation…"
+                            "Waiting for ride start confirmation…",
                           );
 
                           // Also refresh once immediately in case the socket event is missed.
@@ -1128,7 +1145,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                                 emitJobRefresh();
                                 showSuccessToast(
                                   "Ride started",
-                                  "Pickup confirmed."
+                                  "Pickup confirmed.",
                                 );
 
                                 rootNavigation.navigate("RidesTab", {
@@ -1147,7 +1164,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                           showErrorToast(
                             "Invalid code",
                             result.message ??
-                              "Pickup code is incorrect. Please try again."
+                              "Pickup code is incorrect. Please try again.",
                           );
                           return;
                         }
@@ -1156,14 +1173,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                           Alert.alert(
                             "Code locked",
                             result.message ??
-                              "Too many attempts. Please contact support."
+                              "Too many attempts. Please contact support.",
                           );
                           return;
                         }
                       } catch (error) {
                         const message = getErrorMessage(
                           error,
-                          "Failed to verify pickup code"
+                          "Failed to verify pickup code",
                         );
                         showErrorToast("Verification failed", message);
                       } finally {
@@ -1223,6 +1240,47 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   ) : (
                     <Text style={styles.primaryActionLabel}>
                       Confirm cancel
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* No Show Modal */}
+        <Modal visible={noShowModalVisible} animationType="slide" transparent>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.sectionTitle}>Mark as No Show</Text>
+              <Text style={styles.subtle}>
+                Customer did not show up at the pickup location.
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Reason for no show (e.g., waited 10 mins)"
+                placeholderTextColor={colors.muted}
+                multiline
+                value={noShowReason}
+                onChangeText={setNoShowReason}
+              />
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.modalSecondary}
+                  onPress={() => setNoShowModalVisible(false)}
+                >
+                  <Text style={styles.secondaryActionLabel}>Dismiss</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalPrimary, { backgroundColor: "#fa541c" }]}
+                  onPress={confirmNoShow}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryActionLabel}>
+                      Confirm No Show
                     </Text>
                   )}
                 </Pressable>
@@ -1461,10 +1519,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     styles.primaryActionDisabled,
                 ]}
                 onPress={() => {
-                  if (
-                    nextStatus === "COMPLETED" &&
-                    needsCashConfirmation
-                  ) {
+                  if (nextStatus === "COMPLETED" && needsCashConfirmation) {
                     confirmCashAndComplete();
                   } else {
                     handleStatusUpdate(nextStatus);
@@ -1487,12 +1542,20 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               </Pressable>
             )}
 
-            <Pressable
-              style={styles.secondaryAction}
-              onPress={() => setCancelModalVisible(true)}
-            >
-              <Text style={styles.secondaryActionLabel}>Cancel ride</Text>
-            </Pressable>
+            <View style={styles.secondaryActionsRow}>
+              <Pressable
+                style={styles.secondaryActionNoShow}
+                onPress={() => setNoShowModalVisible(true)}
+              >
+                <Text style={styles.secondaryActionNoShowLabel}>No Show</Text>
+              </Pressable>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => setCancelModalVisible(true)}
+              >
+                <Text style={styles.secondaryActionLabel}>Cancel ride</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -1535,6 +1598,45 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         </View>
       </Modal>
 
+      {/* No Show Modal (non-overlay) */}
+      <Modal visible={noShowModalVisible} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.sectionTitle}>Mark as No Show</Text>
+            <Text style={styles.subtle}>
+              Customer did not show up at the pickup location.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Reason for no show (e.g., waited 10 mins)"
+              placeholderTextColor={colors.muted}
+              multiline
+              value={noShowReason}
+              onChangeText={setNoShowReason}
+            />
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalSecondary}
+                onPress={() => setNoShowModalVisible(false)}
+              >
+                <Text style={styles.secondaryActionLabel}>Dismiss</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalPrimary, { backgroundColor: "#fa541c" }]}
+                onPress={confirmNoShow}
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryActionLabel}>Confirm No Show</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Ride Completion Prompt - shown after completing a trip */}
       <FeedbackPrompt
         visible={showFeedbackPrompt}
@@ -1542,575 +1644,608 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         bookingId={job?.id}
         title="Ride Completed Successfully!"
         onNavigateToJob={(jobId) => {
-          rootNavigation.navigate('RidesTab', {
-            screen: 'Rides',
+          rootNavigation.navigate("RidesTab", {
+            screen: "Rides",
             params: {
-              screen: 'JobDetails',
+              screen: "JobDetails",
               params: { jobId },
             },
           });
         }}
         onNavigateHome={() => {
-          rootNavigation.navigate('HomeTab');
+          rootNavigation.navigate("HomeTab");
         }}
       />
     </Screen>
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  fullScreenContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  activeRideContainer: {
-    flex: 1,
-    backgroundColor: colors.pageGradientBg,
-  },
-  mapSection: {
-    height: SCREEN_HEIGHT * 0.35,
-    position: "relative",
-  },
-  detailsPanel: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -16,
-  },
-  detailsPanelContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  maximizeMapButton: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.mapOverlay,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  maximizeMapButtonText: {
-    fontSize: 20,
-    color: colors.text,
-  },
-  closeFullscreenButton: {
-    position: "absolute",
-    top: 40,
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeFullscreenButtonText: {
-    fontSize: 24,
-    color: colors.textInverse,
-    fontWeight: "bold",
-  },
-  fullscreenNavigateContainer: {
-    position: "absolute",
-    bottom: 40,
-    left: 16,
-    right: 16,
-  },
-  statusEtaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  etaBadge: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  etaText: {
-    fontSize: typography.caption,
-    color: colors.primary,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  overlayCustomerPhone: {
-    fontSize: typography.caption,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  customerActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  whatsappButton: {
-    backgroundColor: "#25D366",
-  },
-  locationDetailsCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  locationDetailRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  pickupDot: {
-    backgroundColor: colors.primary,
-  },
-  dropDotStyle: {
-    backgroundColor: colors.accent,
-  },
-  locationDetailText: {
-    flex: 1,
-  },
-  locationDetailLabel: {
-    fontSize: typography.caption,
-    color: colors.muted,
-  },
-  locationDetailValue: {
-    fontSize: typography.body,
-    color: colors.text,
-    marginTop: 2,
-  },
-  locationDetailNote: {
-    fontSize: typography.caption,
-    color: colors.muted,
-    fontStyle: "italic",
-    marginTop: 2,
-  },
-  locationConnector: {
-    width: 2,
-    height: 20,
-    backgroundColor: colors.border,
-    marginLeft: 5,
-    marginVertical: 4,
-  },
-  proximityIndicator: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  proximityNear: {
-    backgroundColor: colors.background,
-    color: colors.brandNavy,
-  },
-  proximityFar: {
-    backgroundColor: colors.pagenavy,
-  },
-  proximityText: {
-    fontSize: typography.caption,
-    textAlign: "center",
-    color: colors.brandNavy,
-  },
-  actionButtonDisabledStyle: {
-    backgroundColor: colors.border,
-    opacity: 0.6,
-  },
-  bottomOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 16,
-    paddingBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  navigateOverlayButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  navigateOverlayButtonText: {
-    color: colors.textInverse,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  overlayStatusBadge: {
-    backgroundColor: colors.background,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    alignSelf: "center",
-  },
-  overlayStatusText: {
-    fontSize: typography.caption,
-    color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  overlayCustomerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  overlayCustomerInfo: {
-    flex: 1,
-  },
-  overlayCustomerName: {
-    fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyMedium,
-    color: colors.text,
-  },
-  overlayCallButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 12,
-  },
-  overlayCallButtonDisabled: {
-    backgroundColor: colors.border,
-    opacity: 0.5,
-  },
-  overlayCallIcon: {
-    fontSize: 20,
-  },
-  overlayPaymentRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    paddingVertical: 8,
-  },
-  overlayPaymentItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  overlayPaymentLabel: {
-    fontSize: typography.caption,
-    color: colors.muted,
-    marginBottom: 4,
-  },
-  overlayPaymentValue: {
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-    color: colors.text,
-  },
-  overlayPaymentPaid: {
-    color: colors.primary,
-  },
-  overlayActionsContainer: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  overlayPrimaryAction: {
-    flex: 2,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  overlayPrimaryActionLabel: {
-    color: colors.textInverse,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  overlayPrimaryActionLabelDisabled: {
-    color: colors.text,
-  },
-  overlayCancelAction: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.danger,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  overlayCancelActionLabel: {
-    color: colors.danger,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  loaderContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  errorText: {
-    fontSize: typography.body,
-    color: colors.danger,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 32,
-    gap: 16,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    minHeight: 48,
-  },
-  jobId: {
-    fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-  },
-  subtle: {
-    fontSize: typography.caption,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  statusChip: {
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  statusChipText: {
-    color: colors.textInverse,
-    fontSize: typography.caption,
-  },
-  section: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sectionTitle: {
-    fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyMedium,
-    marginBottom: 12,
-    color: colors.text,
-    fontWeight: "600",
-  },
-  locationRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  locationBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-    marginTop: 6,
-  },
-  dropBullet: {
-    backgroundColor: colors.accent,
-  },
-  locationLabel: {
-    fontSize: typography.caption,
-    color: colors.muted,
-  },
-  locationValue: {
-    fontSize: typography.body,
-    color: colors.text,
-  },
-  customerName: {
-    fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyMedium,
-    color: colors.muted,
-  },
-  customerContact: {
-    fontSize: typography.body,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 12,
-  },
-  actionButton: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.brandGold,
-    paddingVertical: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionButtonDisabled: {
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    opacity: 0.5,
-  },
-  actionLabel: {
-    fontSize: typography.body,
-    color: colors.background,
-  },
-  actionLabelDisabled: {
-    color: colors.muted,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  distanceTimeRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-  },
-  distanceTimeItem: {
-    alignItems: "center",
-  },
-  distanceTimeValue: {
-    fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.primary,
-  },
-  distanceTimeLabel: {
-    fontSize: typography.caption,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  metaLabel: {
-    fontSize: typography.body,
-    color: colors.muted,
-  },
-  metaValue: {
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-    color: colors.brandNavy,
-  },
-  notes: {
-    marginTop: 8,
-    fontSize: typography.body,
-    color: colors.text,
-  },
-  trackingBadge: {
-    marginTop: 10,
-    fontSize: typography.caption,
-    color: colors.primary,
-  },
-  timelineRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-  timelineIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.border,
-    marginTop: 4,
-  },
-  timelineIndicatorActive: {
-    backgroundColor: colors.primary,
-  },
-  timelineStatus: {
-    fontSize: typography.body,
-    color: colors.muted,
-  },
-  timelineStatusActive: {
-    color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  primaryAction: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  primaryActionDisabled: {
-    backgroundColor: colors.border,
-    opacity: 0.6,
-  },
-  primaryActionLabel: {
-    color: colors.textInverse,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  inProgressWarning: {
-    backgroundColor: "#FFF3E0",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#FFB74D",
-  },
-  inProgressWarningText: {
-    fontSize: typography.caption,
-    color: "#E65100",
-    textAlign: "center",
-  },
-  secondaryAction: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  secondaryActionLabel: {
-    color: colors.danger,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 20,
-  },
-  modalInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 100,
-    padding: 12,
-    marginTop: 16,
-    textAlignVertical: "top",
-  },
-  modalActions: {
-    marginTop: 16,
-    flexDirection: "row",
-    gap: 12,
-  },
-  modalSecondary: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  modalPrimary: {
-    flex: 1,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    fullScreenContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    activeRideContainer: {
+      flex: 1,
+      backgroundColor: colors.pageGradientBg,
+    },
+    mapSection: {
+      height: SCREEN_HEIGHT * 0.35,
+      position: "relative",
+    },
+    detailsPanel: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      marginTop: -16,
+    },
+    detailsPanelContent: {
+      padding: 16,
+      paddingBottom: 32,
+    },
+    maximizeMapButton: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.mapOverlay,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    maximizeMapButtonText: {
+      fontSize: 20,
+      color: colors.text,
+    },
+    closeFullscreenButton: {
+      position: "absolute",
+      top: 40,
+      right: 16,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    closeFullscreenButtonText: {
+      fontSize: 24,
+      color: colors.textInverse,
+      fontWeight: "bold",
+    },
+    fullscreenNavigateContainer: {
+      position: "absolute",
+      bottom: 40,
+      left: 16,
+      right: 16,
+    },
+    statusEtaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    etaBadge: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    etaText: {
+      fontSize: typography.caption,
+      color: colors.primary,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    overlayCustomerPhone: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: 2,
+    },
+    customerActions: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    whatsappButton: {
+      backgroundColor: "#25D366",
+    },
+    locationDetailsCard: {
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 12,
+    },
+    locationDetailRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    locationDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      marginTop: 4,
+    },
+    pickupDot: {
+      backgroundColor: colors.primary,
+    },
+    dropDotStyle: {
+      backgroundColor: colors.accent,
+    },
+    locationDetailText: {
+      flex: 1,
+    },
+    locationDetailLabel: {
+      fontSize: typography.caption,
+      color: colors.muted,
+    },
+    locationDetailValue: {
+      fontSize: typography.body,
+      color: colors.text,
+      marginTop: 2,
+    },
+    locationDetailNote: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      fontStyle: "italic",
+      marginTop: 2,
+    },
+    locationConnector: {
+      width: 2,
+      height: 20,
+      backgroundColor: colors.border,
+      marginLeft: 5,
+      marginVertical: 4,
+    },
+    proximityIndicator: {
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
+    proximityNear: {
+      backgroundColor: colors.background,
+      color: colors.brandNavy,
+    },
+    proximityFar: {
+      backgroundColor: colors.pagenavy,
+    },
+    proximityText: {
+      fontSize: typography.caption,
+      textAlign: "center",
+      color: colors.brandNavy,
+    },
+    actionButtonDisabledStyle: {
+      backgroundColor: colors.border,
+      opacity: 0.6,
+    },
+    bottomOverlay: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 16,
+      paddingBottom: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 10,
+    },
+    navigateOverlayButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    navigateOverlayButtonText: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    overlayStatusBadge: {
+      backgroundColor: colors.background,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+      alignSelf: "center",
+    },
+    overlayStatusText: {
+      fontSize: typography.caption,
+      color: colors.text,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    overlayCustomerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 12,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    overlayCustomerInfo: {
+      flex: 1,
+    },
+    overlayCustomerName: {
+      fontSize: typography.subheading,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.text,
+    },
+    overlayCallButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 12,
+    },
+    overlayCallButtonDisabled: {
+      backgroundColor: colors.border,
+      opacity: 0.5,
+    },
+    overlayCallIcon: {
+      fontSize: 20,
+    },
+    overlayPaymentRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 16,
+      paddingVertical: 8,
+    },
+    overlayPaymentItem: {
+      alignItems: "center",
+      flex: 1,
+    },
+    overlayPaymentLabel: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginBottom: 4,
+    },
+    overlayPaymentValue: {
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.text,
+    },
+    overlayPaymentPaid: {
+      color: colors.primary,
+    },
+    overlayActionsContainer: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    overlayPrimaryAction: {
+      flex: 2,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    overlayPrimaryActionLabel: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    overlayPrimaryActionLabelDisabled: {
+      color: colors.text,
+    },
+    overlayCancelAction: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.danger,
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    overlayCancelActionLabel: {
+      color: colors.danger,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    overlaySecondaryActions: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    overlayNoShowAction: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: "#fa541c",
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    overlayNoShowActionLabel: {
+      color: "#fa541c",
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    loaderContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    errorText: {
+      fontSize: typography.body,
+      color: colors.danger,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 32,
+      gap: 16,
+    },
+    headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      minHeight: 48,
+    },
+    jobId: {
+      fontSize: typography.heading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+    },
+    subtle: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    statusChip: {
+      backgroundColor: colors.primary,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+    },
+    statusChipText: {
+      color: colors.textInverse,
+      fontSize: typography.caption,
+    },
+    section: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    sectionTitle: {
+      fontSize: typography.subheading,
+      fontFamily: typography.fontFamilyMedium,
+      marginBottom: 12,
+      color: colors.text,
+      fontWeight: "600",
+    },
+    locationRow: {
+      flexDirection: "row",
+      gap: 12,
+      alignItems: "flex-start",
+    },
+    locationBullet: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: colors.primary,
+      marginTop: 6,
+    },
+    dropBullet: {
+      backgroundColor: colors.accent,
+    },
+    locationLabel: {
+      fontSize: typography.caption,
+      color: colors.muted,
+    },
+    locationValue: {
+      fontSize: typography.body,
+      color: colors.text,
+    },
+    customerName: {
+      fontSize: typography.subheading,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.muted,
+    },
+    customerContact: {
+      fontSize: typography.body,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    actionRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 12,
+    },
+    actionButton: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.brandGold,
+      paddingVertical: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    actionButtonDisabled: {
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      opacity: 0.5,
+    },
+    actionLabel: {
+      fontSize: typography.body,
+      color: colors.background,
+    },
+    actionLabelDisabled: {
+      color: colors.muted,
+    },
+    metaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    distanceTimeRow: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      marginBottom: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+    },
+    distanceTimeItem: {
+      alignItems: "center",
+    },
+    distanceTimeValue: {
+      fontSize: typography.heading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.primary,
+    },
+    distanceTimeLabel: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: 4,
+    },
+    metaLabel: {
+      fontSize: typography.body,
+      color: colors.muted,
+    },
+    metaValue: {
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.brandNavy,
+    },
+    notes: {
+      marginTop: 8,
+      fontSize: typography.body,
+      color: colors.text,
+    },
+    trackingBadge: {
+      marginTop: 10,
+      fontSize: typography.caption,
+      color: colors.primary,
+    },
+    timelineRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginBottom: 12,
+    },
+    timelineIndicator: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.border,
+      marginTop: 4,
+    },
+    timelineIndicatorActive: {
+      backgroundColor: colors.primary,
+    },
+    timelineStatus: {
+      fontSize: typography.body,
+      color: colors.muted,
+    },
+    timelineStatusActive: {
+      color: colors.text,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    primaryAction: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      paddingVertical: 16,
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    primaryActionDisabled: {
+      backgroundColor: colors.border,
+      opacity: 0.6,
+    },
+    primaryActionLabel: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    inProgressWarning: {
+      backgroundColor: "#FFF3E0",
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: "#FFB74D",
+    },
+    inProgressWarningText: {
+      fontSize: typography.caption,
+      color: "#E65100",
+      textAlign: "center",
+    },
+    secondaryActionsRow: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      gap: 16,
+    },
+    secondaryAction: {
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    secondaryActionLabel: {
+      color: colors.danger,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    secondaryActionNoShow: {
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    secondaryActionNoShowLabel: {
+      color: "#fa541c",
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      justifyContent: "center",
+      padding: 24,
+    },
+    modalCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 20,
+    },
+    modalInput: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 100,
+      padding: 12,
+      marginTop: 16,
+      textAlignVertical: "top",
+    },
+    modalActions: {
+      marginTop: 16,
+      flexDirection: "row",
+      gap: 12,
+    },
+    modalSecondary: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    modalPrimary: {
+      flex: 1,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+  });

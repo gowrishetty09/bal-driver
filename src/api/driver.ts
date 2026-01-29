@@ -5,7 +5,7 @@ import { API_BASE_URL, USE_MOCKS } from '../utils/config';
 import { SessionTokens, TokenResponse, deriveSessionTokens } from '../types/auth';
 
 export type JobType = 'ACTIVE' | 'UPCOMING' | 'HISTORY';
-export type JobStatus = 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'PICKED_UP' | 'COMPLETED' | 'CANCELLED';
+export type JobStatus = 'ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'PICKED_UP' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 
 export type DriverUser = {
     id: string;
