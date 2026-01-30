@@ -1,34 +1,31 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
   Dimensions,
   Platform,
-  Linking,
-  Pressable,
 } from "react-native";
 import MapView, {
   Marker,
   Polyline,
   PROVIDER_GOOGLE,
-  Region,
 } from "react-native-maps";
-import { useTheme, ThemeColors } from "../context/ThemeContext";
-import { typography } from "../theme/typography";
+import { useTheme } from "../context/ThemeContext";
 import type { Coordinates, JobStatus } from "../api/driver";
 import { GOOGLE_DIRECTIONS_API_KEY } from "../utils/config";
 
 const { width, height } = Dimensions.get("window");
-const ASPECT_RATIO = width / height;
-const LATITUDE_DELTA = 0.02;
-const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+
+// Default center: Hyderabad, India
+const DEFAULT_CENTER = { lat: 17.385, lng: 78.4867 };
+
+const MAP_EDGE_PADDING = {
+  top: 80,
+  right: 50,
+  bottom: 80,
+  left: 50,
+};
 
 interface RideMapViewProps {
   driverLocation: { latitude: number; longitude: number } | null;
@@ -44,31 +41,63 @@ interface RideMapViewProps {
   estimatedDistance?: string;
 }
 
-// Light map style for better visibility
-const lightMapStyle = [
-  {
-    featureType: "poi",
-    elementType: "labels",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "labels",
-    stylers: [{ visibility: "off" }],
-  },
-];
+// Helper to safely convert to number
+const toNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
 
-const decodePolyline = (encoded: string) => {
-  // Returns [{ latitude, longitude }, ...]
+// Validate coordinate is valid and not 0,0
+const isValidCoord = (lat: number | null, lng: number | null): boolean => {
+  if (lat === null || lng === null) return false;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
+  // Avoid 0,0 (null island)
+  if (Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001) return false;
+  return true;
+};
+
+// Convert Coordinates to {lat, lng} format
+const extractLatLng = (coords: Coordinates | null | undefined): { lat: number; lng: number } | null => {
+  if (!coords) return null;
+  
+  const lat = toNumber((coords as any).lat ?? (coords as any).latitude);
+  const lng = toNumber((coords as any).lng ?? (coords as any).longitude);
+  
+  if (isValidCoord(lat, lng)) {
+    return { lat: lat!, lng: lng! };
+  }
+  return null;
+};
+
+// Convert driver location {latitude, longitude} to {lat, lng}
+const extractDriverLatLng = (loc: { latitude: number; longitude: number } | null): { lat: number; lng: number } | null => {
+  if (!loc) return null;
+  
+  const lat = toNumber(loc.latitude);
+  const lng = toNumber(loc.longitude);
+  
+  if (isValidCoord(lat, lng)) {
+    return { lat: lat!, lng: lng! };
+  }
+  return null;
+};
+
+// Decode Google encoded polyline
+const decodePolyline = (encoded: string): Array<{ latitude: number; longitude: number }> => {
+  const points: Array<{ latitude: number; longitude: number }> = [];
   let index = 0;
   let lat = 0;
   let lng = 0;
-  const coordinates: Array<{ latitude: number; longitude: number }> = [];
 
   while (index < encoded.length) {
-    let result = 0;
+    let b: number;
     let shift = 0;
-    let b = 0;
+    let result = 0;
 
     do {
       b = encoded.charCodeAt(index++) - 63;
@@ -76,11 +105,11 @@ const decodePolyline = (encoded: string) => {
       shift += 5;
     } while (b >= 0x20);
 
-    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
-    lat += deltaLat;
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
 
-    result = 0;
     shift = 0;
+    result = 0;
 
     do {
       b = encoded.charCodeAt(index++) - 63;
@@ -88,13 +117,13 @@ const decodePolyline = (encoded: string) => {
       shift += 5;
     } while (b >= 0x20);
 
-    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
-    lng += deltaLng;
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
 
-    coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
   }
 
-  return coordinates;
+  return points;
 };
 
 export const RideMapView: React.FC<RideMapViewProps> = ({
@@ -104,289 +133,145 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   status,
   pickupAddress,
   dropAddress,
-  onNavigatePress,
   fullScreen = false,
-  showDirections = false,
   estimatedTime,
   estimatedDistance,
 }) => {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const readLatLng = (c?: any) => {
-    if (!c)
-      return {
-        lat: undefined as number | undefined,
-        lng: undefined as number | undefined,
-      };
-    const tryNum = (v: any) => {
-      if (typeof v === "number") return v;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : undefined;
-    };
-    const lat = tryNum(
-      c.lat ?? c.latitude ?? c.latValue ?? c.latitudeValue ?? c.latitudeValue
-    );
-    const lng = tryNum(
-      c.lng ?? c.longitude ?? c.lngValue ?? c.longitudeValue ?? c.longitudeValue
-    );
-    return { lat, lng };
-  };
   const mapRef = useRef<MapView>(null);
-  const [routeCoordinates, setRouteCoordinates] = useState<
-    Array<{ latitude: number; longitude: number }>
-  >([]);
+  const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  const [routeIsDirections, setRouteIsDirections] = useState(false);
+  const lastRouteFetchRef = useRef<{ ts: number; origin: string; destination: string } | null>(null);
+  const hasFittedMapRef = useRef(false);
 
-  // Determine which location to navigate to based on status
-  const destination = useMemo(() => {
-    // Before pickup: navigate to pickup
-    // After pickup: navigate to drop
-    if (status === "PICKED_UP" && dropCoords) {
-      return { coords: dropCoords, label: "Drop-off" };
-    }
-    if (pickupCoords) {
-      return { coords: pickupCoords, label: "Pickup" };
-    }
-    return null;
-  }, [status, pickupCoords, dropCoords]);
+  // Extract and validate coordinates
+  const driverLatLng = extractDriverLatLng(driverLocation);
+  const pickupLatLng = extractLatLng(pickupCoords);
+  const dropLatLng = extractLatLng(dropCoords);
+
+  // Determine destination based on status
+  const isAfterPickup = status === "PICKED_UP";
+  const destinationLatLng = isAfterPickup ? dropLatLng : pickupLatLng;
 
   // Fetch directions from Google Directions API
-  const fetchDirections = useCallback(async () => {
-    try {
-      if (!driverLocation || !destination?.coords) {
-        setRouteCoordinates([]);
+  useEffect(() => {
+    const fetchRoute = async () => {
+      const origin = driverLatLng;
+      const destination = destinationLatLng;
+
+      // Fallback: if no driver, show route from pickup to drop
+      const fallbackOrigin = pickupLatLng;
+      const fallbackDestination = dropLatLng;
+
+      const routeOrigin = origin && destination ? origin : fallbackOrigin;
+      const routeDestination = origin && destination ? destination : fallbackDestination;
+
+      if (!routeOrigin || !routeDestination) {
+        setRoutePoints([]);
+        setRouteIsDirections(false);
         return;
       }
 
-      const { lat: dLat, lng: dLng } = readLatLng(destination.coords as any);
-      if (typeof dLat !== "number" || typeof dLng !== "number") {
-        console.warn(
-          "[Map] Destination coords invalid for directions:",
-          destination.coords
-        );
-        setRouteCoordinates([]);
-        return;
+      // Throttle: only fetch every 15 seconds
+      const now = Date.now();
+      const originKey = `${routeOrigin.lat},${routeOrigin.lng}`;
+      const destKey = `${routeDestination.lat},${routeDestination.lng}`;
+      const last = lastRouteFetchRef.current;
+
+      if (last && now - last.ts < 15000) {
+        if (last.origin === originKey && last.destination === destKey) {
+          return;
+        }
       }
 
-      // If no key configured, fallback to straight line.
+      // If no API key, use straight line
       if (!GOOGLE_DIRECTIONS_API_KEY) {
-        setRouteCoordinates([
-          driverLocation,
-          { latitude: dLat, longitude: dLng },
+        setRoutePoints([
+          { latitude: routeOrigin.lat, longitude: routeOrigin.lng },
+          { latitude: routeDestination.lat, longitude: routeDestination.lng },
         ]);
+        setRouteIsDirections(false);
         return;
       }
 
-      const params = new URLSearchParams({
-        origin: `${driverLocation.latitude},${driverLocation.longitude}`,
-        destination: `${dLat},${dLng}`,
-        mode: "driving",
-        key: GOOGLE_DIRECTIONS_API_KEY,
-      });
+      try {
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originKey}&destination=${destKey}&mode=driving&key=${GOOGLE_DIRECTIONS_API_KEY}`;
+        
+        const response = await fetch(url);
+        const json = await response.json();
 
-      const url = `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`;
-      const response = await fetch(url);
-      const data = await response.json();
+        if (json.status === "OK" && json.routes?.[0]?.overview_polyline?.points) {
+          const decoded = decodePolyline(json.routes[0].overview_polyline.points);
+          setRoutePoints(decoded);
+          setRouteIsDirections(true);
+          lastRouteFetchRef.current = { ts: now, origin: originKey, destination: destKey };
+          return;
+        }
 
-      if (data?.status !== "OK" || !data?.routes?.length) {
-        console.warn(
-          "[Map] Directions API error:",
-          data?.status,
-          data?.error_message
-        );
-        setRouteCoordinates([
-          driverLocation,
-          { latitude: dLat, longitude: dLng },
+        // Fallback to straight line
+        setRoutePoints([
+          { latitude: routeOrigin.lat, longitude: routeOrigin.lng },
+          { latitude: routeDestination.lat, longitude: routeDestination.lng },
         ]);
-        return;
-      }
-
-      const points: string | undefined =
-        data.routes?.[0]?.overview_polyline?.points;
-      if (!points) {
-        setRouteCoordinates([
-          driverLocation,
-          { latitude: dLat, longitude: dLng },
+        setRouteIsDirections(false);
+      } catch (error) {
+        console.warn("[RideMapView] Directions error:", error);
+        setRoutePoints([
+          { latitude: routeOrigin.lat, longitude: routeOrigin.lng },
+          { latitude: routeDestination.lat, longitude: routeDestination.lng },
         ]);
-        return;
+        setRouteIsDirections(false);
       }
+    };
 
-      const decoded = decodePolyline(points);
-      if (decoded.length < 2) {
-        setRouteCoordinates([
-          driverLocation,
-          { latitude: dLat, longitude: dLng },
-        ]);
-        return;
-      }
+    fetchRoute();
+  }, [driverLatLng?.lat, driverLatLng?.lng, destinationLatLng?.lat, destinationLatLng?.lng, pickupLatLng, dropLatLng]);
 
-      setRouteCoordinates(decoded);
-    } catch (error) {
-      console.warn("[Map] Error in fetchDirections:", error);
-      setRouteCoordinates([]);
-    }
-  }, [driverLocation, destination]);
-
-  // Fetch directions when relevant data changes
-  useEffect(() => {
-    try {
-      if (showDirections) {
-        fetchDirections();
-      }
-    } catch (error) {
-      console.warn("[Map] Error fetching directions:", error);
-    }
-  }, [showDirections, fetchDirections]);
-
-  // Debug: log coords when map has no valid markers (help diagnose missing data)
-  useEffect(() => {
-    const hasDriver = !!driverLocation;
-    const hasPickup = !!pickupCoords;
-    const hasDrop = !!dropCoords;
-    if (!hasDriver && !hasPickup && !hasDrop) {
-      console.warn("[RideMapView] No coordinates provided:", {
-        driverLocation,
-        pickupCoords,
-        dropCoords,
-        status,
-      });
-    }
-  }, [driverLocation, pickupCoords, dropCoords, status]);
-
-  // Calculate route points for the polyline (fallback if directions not fetched)
-  const routePoints = useMemo(() => {
-    if (routeCoordinates.length > 0) {
-      return routeCoordinates;
-    }
-
-    const points: Array<{ latitude: number; longitude: number }> = [];
-
-    if (driverLocation) {
-      points.push(driverLocation);
-    }
-
-    if (destination?.coords) {
-      const { lat: dLat, lng: dLng } = readLatLng(destination.coords as any);
-      if (typeof dLat === "number" && typeof dLng === "number") {
-        points.push({ latitude: dLat, longitude: dLng });
-      } else {
-        console.warn(
-          "[Map] routePoints: destination coords invalid",
-          destination.coords
-        );
-      }
-    }
-
-    return points;
-  }, [driverLocation, destination, routeCoordinates]);
-
-  // Fit map to show all markers
+  // Fit map to show all points (only once when route is ready)
   useEffect(() => {
     if (!mapRef.current) return;
+    
+    // Only fit once when we have a valid route
+    if (hasFittedMapRef.current) return;
 
-    const markers: Array<{ latitude: number; longitude: number }> = [];
+    // Wait until we have route points or at least pickup + drop
+    if (routePoints.length === 0 && !(pickupLatLng && dropLatLng)) return;
 
-    if (driverLocation) {
-      markers.push(driverLocation);
-    }
-    if (pickupCoords) {
-      const { lat: pLat, lng: pLng } = readLatLng(pickupCoords as any);
-      if (typeof pLat === "number" && typeof pLng === "number") {
-        markers.push({ latitude: pLat, longitude: pLng });
-      } else {
-        console.warn("[Map] fitBounds: pickupCoords invalid", pickupCoords);
-      }
-    }
-    if (dropCoords) {
-      const { lat: dLat, lng: dLng } = readLatLng(dropCoords as any);
-      if (typeof dLat === "number" && typeof dLng === "number") {
-        markers.push({ latitude: dLat, longitude: dLng });
-      } else {
-        console.warn("[Map] fitBounds: dropCoords invalid", dropCoords);
-      }
+    const fit: Array<{ latitude: number; longitude: number }> = [];
+
+    if (routePoints.length >= 2) {
+      fit.push(...routePoints);
+    } else if (pickupLatLng && dropLatLng) {
+      // Show pickup and drop if no route yet
+      fit.push({ latitude: pickupLatLng.lat, longitude: pickupLatLng.lng });
+      fit.push({ latitude: dropLatLng.lat, longitude: dropLatLng.lng });
     }
 
-    if (markers.length > 1) {
-      setTimeout(() => {
-        mapRef.current?.fitToCoordinates(markers, {
-          edgePadding: { top: 80, right: 50, bottom: 80, left: 50 },
-          animated: true,
-        });
-      }, 500);
-    } else if (markers.length === 1) {
-      mapRef.current?.animateToRegion({
-        latitude: markers[0].latitude,
-        longitude: markers[0].longitude,
-        latitudeDelta: LATITUDE_DELTA,
-        longitudeDelta: LONGITUDE_DELTA,
+    if (fit.length < 2) return;
+
+    const timeout = setTimeout(() => {
+      mapRef.current?.fitToCoordinates(fit, {
+        edgePadding: MAP_EDGE_PADDING,
+        animated: false, // No animation to prevent jarring re-fits
       });
-    }
-  }, [driverLocation, pickupCoords, dropCoords]);
+      hasFittedMapRef.current = true;
+    }, 500);
 
-  const handleNavigate = useCallback(() => {
-    if (!destination?.coords) return;
+    return () => clearTimeout(timeout);
+  }, [routePoints.length, pickupLatLng?.lat, pickupLatLng?.lng, dropLatLng?.lat, dropLatLng?.lng]);
 
-    const { lat, lng } = destination.coords;
-    const label = encodeURIComponent(destination.label);
+  // Calculate initial region
+  const initialCenter = driverLatLng || pickupLatLng || dropLatLng || DEFAULT_CENTER;
 
-    // Open in Google Maps for navigation
-    const url = Platform.select({
-      ios: `maps://app?daddr=${lat},${lng}&dirflg=d`,
-      android: `google.navigation:q=${lat},${lng}`,
-    });
-
-    if (url) {
-      Linking.canOpenURL(url).then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          // Fallback to web Google Maps
-          Linking.openURL(
-            `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-          );
-        }
-      });
-    }
-
-    onNavigatePress?.();
-  }, [destination, onNavigatePress]);
-
-  // Get initial region
-  const initialRegion: Region = useMemo(() => {
-    if (driverLocation) {
-      return {
-        latitude: driverLocation.latitude,
-        longitude: driverLocation.longitude,
-        latitudeDelta: LATITUDE_DELTA,
-        longitudeDelta: LONGITUDE_DELTA,
-      };
-    }
-    if (pickupCoords) {
-      const { lat: pLat, lng: pLng } = readLatLng(pickupCoords as any);
-      if (typeof pLat === "number" && typeof pLng === "number") {
-        return {
-          latitude: pLat,
-          longitude: pLng,
-          latitudeDelta: LATITUDE_DELTA,
-          longitudeDelta: LONGITUDE_DELTA,
-        };
-      }
-      console.warn("[Map] initialRegion: pickupCoords invalid", pickupCoords);
-    }
-    // Default to a generic location if nothing available
-    return {
-      latitude: 12.9716,
-      longitude: 77.5946,
-      latitudeDelta: LATITUDE_DELTA,
-      longitudeDelta: LONGITUDE_DELTA,
-    };
-  }, [driverLocation, pickupCoords]);
-
-  const hasValidCoords = driverLocation || pickupCoords || dropCoords;
+  // Check if we have any valid coordinates to show
+  const hasValidCoords = driverLatLng || pickupLatLng || dropLatLng;
 
   if (!hasValidCoords) {
     return (
-      <View style={styles.noMapContainer}>
-        <Text style={styles.noMapText}>Location coordinates not available</Text>
+      <View style={[styles.container, styles.noMapContainer]}>
+        <Text style={[styles.noMapText, { color: colors.muted }]}>
+          Waiting for location...
+        </Text>
       </View>
     );
   }
@@ -396,148 +281,106 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={initialRegion}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+        mapType="standard"
+        loadingEnabled
+        initialRegion={{
+          latitude: initialCenter.lat,
+          longitude: initialCenter.lng,
+          latitudeDelta: 0.1,
+          longitudeDelta: 0.1,
+        }}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={true}
-        rotateEnabled={true}
-        zoomEnabled={true}
-        pitchEnabled={true}
-        onMapReady={() => console.log("[Map] Map is ready")}
-        onMapLoaded={() => console.log("[Map] Map tiles loaded")}
       >
-        {/* Driver location marker - styled as a car */}
-        {driverLocation && (
+        {/* Driver Marker */}
+        {driverLatLng && (
           <Marker
-            coordinate={driverLocation}
+            key="driver-marker"
+            identifier="driver-marker"
+            coordinate={{
+              latitude: driverLatLng.lat,
+              longitude: driverLatLng.lng,
+            }}
             title="Your Location"
-            anchor={{ x: 0.5, y: 0.5 }}
-            flat={true}
-          >
-            <View style={styles.driverMarkerContainer}>
-              <View style={styles.driverMarker}>
-                <Text style={styles.driverMarkerIcon}>🚗</Text>
-              </View>
-            </View>
-          </Marker>
+            pinColor="#2196F3"
+          />
         )}
 
-        {/* Pickup marker */}
-        {pickupCoords &&
-          status !== "PICKED_UP" &&
-          (() => {
-            const { lat: pLat, lng: pLng } = readLatLng(pickupCoords as any);
-            if (typeof pLat !== "number" || typeof pLng !== "number")
-              return null;
-            return (
-              <Marker
-                coordinate={{
-                  latitude: pLat,
-                  longitude: pLng,
-                }}
-                title="Pickup"
-                description={pickupAddress}
-              >
-                <View style={styles.pickupMarkerContainer}>
-                  <View style={styles.pickupMarker}>
-                    <Text style={styles.markerLabel}>P</Text>
-                  </View>
-                  <View style={styles.markerPin} />
-                </View>
-              </Marker>
-            );
-          })()}
+        {/* Pickup Marker - show before pickup */}
+        {pickupLatLng && !isAfterPickup && (
+          <Marker
+            key="pickup-marker"
+            identifier="pickup-marker"
+            coordinate={{
+              latitude: pickupLatLng.lat,
+              longitude: pickupLatLng.lng,
+            }}
+            title="Pickup"
+            description={pickupAddress}
+            pinColor="#4CAF50"
+          />
+        )}
 
-        {/* Drop marker */}
-        {dropCoords &&
-          (() => {
-            const { lat: dLat, lng: dLng } = readLatLng(dropCoords as any);
-            if (typeof dLat !== "number" || typeof dLng !== "number")
-              return null;
-            return (
-              <Marker
-                coordinate={{
-                  latitude: dLat,
-                  longitude: dLng,
-                }}
-                title="Drop-off"
-                description={dropAddress}
-              >
-                <View style={styles.dropMarkerContainer}>
-                  <View style={styles.dropMarkerStyle}>
-                    <Text style={styles.markerLabel}>D</Text>
-                  </View>
-                  <View style={[styles.markerPin, styles.dropPin]} />
-                </View>
-              </Marker>
-            );
-          })()}
+        {/* Drop Marker - always show */}
+        {dropLatLng && (
+          <Marker
+            key="drop-marker"
+            identifier="drop-marker"
+            coordinate={{
+              latitude: dropLatLng.lat,
+              longitude: dropLatLng.lng,
+            }}
+            title="Drop-off"
+            description={dropAddress}
+            pinColor="#F44336"
+          />
+        )}
 
-        {/* Route polyline */}
-        {routePoints.length >= 2 && (
+        {/* Route Polyline */}
+        {routePoints.length > 1 && (
           <Polyline
+            key="route-polyline"
             coordinates={routePoints}
-            strokeColor={colors.primary}
-            strokeWidth={5}
-            lineCap="round"
-            lineJoin="round"
+            strokeColor="#2196F3"
+            strokeWidth={4}
+            zIndex={1}
           />
         )}
       </MapView>
 
-      {/* ETA and Distance badge - top left */}
+      {/* ETA Overlay */}
       {(estimatedTime || estimatedDistance) && (
-        <View style={styles.etaContainer}>
+        <View style={[styles.etaContainer, { backgroundColor: colors.card }]}>
           {estimatedTime && (
             <View style={styles.etaBadge}>
               <Text style={styles.etaIcon}>⏱</Text>
-              <Text style={styles.etaText}>{estimatedTime}</Text>
+              <Text style={[styles.etaText, { color: colors.text }]}>{estimatedTime}</Text>
             </View>
           )}
           {estimatedDistance && (
             <View style={styles.etaBadge}>
               <Text style={styles.etaIcon}>📍</Text>
-              <Text style={styles.etaText}>{estimatedDistance}</Text>
+              <Text style={[styles.etaText, { color: colors.text }]}>{estimatedDistance}</Text>
             </View>
           )}
-        </View>
-      )}
-
-      {/* Status indicator - top center */}
-      <View style={styles.statusOverlay}>
-        <Text style={styles.statusText}>
-          {status === "EN_ROUTE" && "🚗 Heading to pickup"}
-          {status === "ARRIVED" && "📍 Waiting at pickup"}
-          {status === "PICKED_UP" && "🛣️ En route to drop-off"}
-        </Text>
-      </View>
-
-      {/* Navigate button - only show in non-fullscreen mode */}
-      {destination && !fullScreen && (
-        <View style={styles.navigationOverlay}>
-          <Pressable style={styles.navigateButton} onPress={handleNavigate}>
-            <Text style={styles.navigateButtonText}>
-              🧭 Navigate to {destination.label}
-            </Text>
-          </Pressable>
         </View>
       )}
     </View>
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
-    height: 250,
-    borderRadius: 0,
+    flex: 1,
+    minHeight: 250,
     overflow: "hidden",
     marginBottom: 16,
   },
   fullScreenContainer: {
     ...StyleSheet.absoluteFillObject,
     height: "100%",
-    borderRadius: 0,
     marginBottom: 0,
   },
   map: {
@@ -546,140 +389,71 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   noMapContainer: {
     height: 150,
     borderRadius: 16,
-    backgroundColor: colors.background,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
   },
   noMapText: {
-    color: colors.muted,
-    fontSize: typography.body,
-  },
-  driverMarkerContainer: {
-    alignItems: "center",
-    justifyContent: "center",
+    fontSize: 14,
   },
   driverMarker: {
-    elevation: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 44,
+    height: 44,
   },
   driverMarkerIcon: {
-    fontSize: 24,
+    fontSize: 32,
   },
-  pickupMarkerContainer: {
+  markerContainer: {
     alignItems: "center",
   },
-  pickupMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
-  },
-  dropMarkerContainer: {
-    alignItems: "center",
-  },
-  dropMarkerStyle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.accent,
+  markerCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
     elevation: 5,
   },
-  markerLabel: {
-    color: colors.text,
-    fontSize: 14,
+  markerText: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontWeight: "bold",
   },
   markerPin: {
-    width: 3,
-    height: 10,
-    backgroundColor: colors.primary,
+    width: 4,
+    height: 12,
     marginTop: -2,
-  },
-  dropPin: {
-    backgroundColor: colors.accent,
-  },
-  markerDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    borderWidth: 3,
-    borderColor: colors.textInverse,
-  },
-  dropDot: {
-    backgroundColor: colors.accent,
   },
   etaContainer: {
     position: "absolute",
-    top: 50,
+    top: 12,
     left: 12,
-    flexDirection: "column",
-    gap: 8,
-  },
-  etaBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.card,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
     borderRadius: 8,
+    padding: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 3,
   },
+  etaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 2,
+  },
   etaIcon: {
     fontSize: 14,
-    marginRight: 4,
+    marginRight: 6,
   },
   etaText: {
-    fontSize: typography.caption,
-    color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  navigationOverlay: {
-    position: "absolute",
-    bottom: 12,
-    left: 12,
-    right: 12,
-  },
-  navigateButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  navigateButtonText: {
-    color: colors.textInverse,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  statusOverlay: {
-    position: "absolute",
-    top: 12,
-    left: 60,
-    right: 60,
-  },
-  statusText: {
-    backgroundColor: colors.mapOverlay,
-    color: colors.textInverse,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    fontSize: typography.caption,
-    textAlign: "center",
-    overflow: "hidden",
+    fontSize: 13,
+    fontWeight: "500",
   },
 });

@@ -40,7 +40,7 @@ import {
 } from "../../utils/toast";
 import { emitJobRefresh } from "../../utils/events";
 import { socketService } from "../../services/socketService";
-import { formatMYR, shortBookingRef, bookingRefFull } from "../../utils/format";
+import { formatMYR, formatBookingRef, bookingRefFull } from "../../utils/format";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -849,7 +849,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 {job.passengerName || "Customer"}
               </Text>
               <Text style={styles.overlayCustomerPhone}>
-                Booking ID: {shortBookingRef(job.id)}
+                Booking ID: {formatBookingRef(job.id, job.source)}
               </Text>
               {job.passengerPhone && job.passengerPhone.trim() !== "" && (
                 <Text style={styles.overlayCustomerPhone}>
@@ -961,30 +961,42 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             </View>
           </View>
 
-          {/* Proximity indicator for ARRIVED status validation */}
-          {job.status === "EN_ROUTE" && (
-            <View
-              style={[
-                styles.proximityIndicator,
-                isNearPickup ? styles.proximityNear : styles.proximityFar,
-              ]}
+          {/* Navigate to Pickup/Drop button */}
+          {job.status === "EN_ROUTE" && job.pickupCoords && (
+            <Pressable
+              style={styles.navigateButton}
+              onPress={() => {
+                const { lat, lng } = job.pickupCoords!;
+                const url = `google.navigation:q=${lat},${lng}`;
+                Linking.openURL(url).catch(() => {
+                  Linking.openURL(
+                    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+                  );
+                });
+              }}
             >
-              <Text style={styles.proximityText}>
-                {isNearPickup
-                  ? `✓ You are at the pickup location${
-                      pickupProximity.canVerify &&
-                      typeof pickupProximity.distanceMeters === "number"
-                        ? ` (~${Math.round(pickupProximity.distanceMeters)}m)`
-                        : ""
-                    }`
-                  : pickupProximity.canVerify &&
-                      typeof pickupProximity.distanceMeters === "number"
-                    ? `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m) • ~${Math.round(
-                        pickupProximity.distanceMeters,
-                      )}m away`
-                    : `Navigate to pickup to mark as arrived (within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m)`}
+              <Text style={styles.navigateButtonText}>
+                🧭 Navigate to Pickup
               </Text>
-            </View>
+            </Pressable>
+          )}
+          {job.status === "PICKED_UP" && job.dropCoords && (
+            <Pressable
+              style={styles.navigateButton}
+              onPress={() => {
+                const { lat, lng } = job.dropCoords!;
+                const url = `google.navigation:q=${lat},${lng}`;
+                Linking.openURL(url).catch(() => {
+                  Linking.openURL(
+                    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+                  );
+                });
+              }}
+            >
+              <Text style={styles.navigateButtonText}>
+                🧭 Navigate to Drop-off
+              </Text>
+            </Pressable>
           )}
 
           {/* Action buttons */}
@@ -1310,7 +1322,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.jobId}>{shortBookingRef(job.id)}</Text>
+            <Text style={styles.jobId}>{formatBookingRef(job.id, job.source)}</Text>
             <Text style={[styles.subtle, { marginTop: 6 }]}>
               Vehicle: {job.vehiclePlate ?? "—"}
             </Text>
@@ -1668,7 +1680,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     activeRideContainer: {
       flex: 1,
-      backgroundColor: colors.pageGradientBg,
+      backgroundColor: colors.background,
     },
     mapSection: {
       height: SCREEN_HEIGHT * 0.35,
@@ -1812,7 +1824,7 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.brandNavy,
     },
     proximityFar: {
-      backgroundColor: colors.pagenavy,
+      backgroundColor: colors.brandGold,
     },
     proximityText: {
       fontSize: typography.caption,
@@ -1921,12 +1933,24 @@ const createStyles = (colors: ThemeColors) =>
     overlayPaymentPaid: {
       color: colors.primary,
     },
+    navigateButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    navigateButtonText: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
     overlayActionsContainer: {
-      flexDirection: "row",
+      flexDirection: "column",
       gap: 12,
     },
     overlayPrimaryAction: {
-      flex: 2,
       backgroundColor: colors.primary,
       borderRadius: 12,
       paddingVertical: 14,

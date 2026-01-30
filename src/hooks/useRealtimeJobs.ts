@@ -33,6 +33,7 @@ const normalizeIncomingJob = (payload: any, defaultType: JobType): DriverJob | n
 			status: payload.status,
 			type,
 			rideType: payload.rideType,
+			source: payload.source,
 			vehicleNumber: payload.vehicle?.registrationNo ?? payload.vehicleNumber,
 			pickup: payload.pickup ? payload.pickup : payload.pickupLocation ? { addressLine: payload.pickupLocation } : null,
 			dropoff: payload.dropoff ? payload.dropoff : payload.dropLocation ? { addressLine: payload.dropLocation } : null,

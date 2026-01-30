@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { enableScreens } from "react-native-screens";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Loader } from "../components/Loader";
 import { useTheme } from "../context/ThemeContext";
@@ -308,6 +309,7 @@ const tabIcons: Record<keyof MainTabParamList, IconName> = {
 
 const MainTabsNavigator = () => {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs.Navigator
@@ -319,8 +321,8 @@ const MainTabsNavigator = () => {
           backgroundColor: colors.tabBarBackground,
           borderTopColor: colors.border,
           paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
+          paddingBottom: Math.max(insets.bottom, 8),
+          height: 60 + insets.bottom,
         },
         tabBarLabelStyle: {
           fontWeight: "600" as const,

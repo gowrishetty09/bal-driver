@@ -18,7 +18,7 @@ import { typography } from "../../theme/typography";
 import type { DriverJob, JobType } from "../../api/driver";
 import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
 import type { RidesStackParamList } from "../../types/navigation";
-import { shortBookingRef } from "../../utils/format";
+import { formatBookingRef } from "../../utils/format";
 
 type Props = NativeStackScreenProps<RidesStackParamList, "Rides">;
 
@@ -68,8 +68,8 @@ export const RidesScreen: React.FC<Props> = ({ navigation, route }) => {
     if (!query || query.trim() === "") return bookings;
     const q = query.trim().toLowerCase();
     return bookings.filter((j) => {
-      const shortRef = shortBookingRef(j.id).toLowerCase();
-      const idMatch = j.id?.toLowerCase().includes(q) || shortRef.includes(q);
+      const bookingRef = formatBookingRef(j.id, j.source).toLowerCase();
+      const idMatch = j.id?.toLowerCase().includes(q) || bookingRef.includes(q);
       const nameMatch = (j.passengerName ?? "").toLowerCase().includes(q);
       const vehicleMatch = (j.vehicleNumber ?? "").toLowerCase().includes(q);
       return idMatch || nameMatch || vehicleMatch;
@@ -84,7 +84,7 @@ export const RidesScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           <Text style={styles.jobRef} numberOfLines={1}>
-            {shortBookingRef(item.id)}
+            {formatBookingRef(item.id, item.source)}
           </Text>
           <Text style={styles.subtle} numberOfLines={1}>
             {item.vehicleNumber ?? "—"}

@@ -55,6 +55,7 @@ export type DriverJob = {
     status: JobStatus;
     type: JobType;
     rideType?: string;
+    source?: string;
     vehicleNumber?: string;
     pickup?: LocationPoint | null;
     dropoff?: LocationPoint | null;
@@ -310,6 +311,7 @@ type BackendJob = {
     pickupTime?: string;
     status: JobStatus;
     rideType?: string;
+    source?: string | null;
     pickupLocation?: string | null;
     dropLocation?: string | null;
     pickupCoords?: { lat: number; lng: number } | null;
@@ -334,6 +336,7 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     status: j.status,
     type: listType,
     rideType: j.rideType ?? undefined,
+    source: j.source ?? undefined,
     pickup: j.pickupLocation && j.pickupLocation.trim() !== ''
         ? { addressLine: j.pickupLocation }
         : undefined,

@@ -19,7 +19,7 @@ import { typography } from "../../theme/typography";
 import { HistoryJobsStackParamList } from "../../types/navigation";
 import { DriverJob } from "../../api/driver";
 import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
-import { formatMYR, shortBookingRef } from "../../utils/format";
+import { formatMYR, formatBookingRef } from "../../utils/format";
 
 type Props = NativeStackScreenProps<HistoryJobsStackParamList, "HistoryJobs">;
 
@@ -50,8 +50,8 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
     if (!query || query.trim() === "") return jobs;
     const q = query.trim().toLowerCase();
     return jobs.filter((j) => {
-      const shortRef = shortBookingRef(j.id).toLowerCase();
-      const idMatch = j.id?.toLowerCase().includes(q) || shortRef.includes(q);
+      const bookingRef = formatBookingRef(j.id, j.source).toLowerCase();
+      const idMatch = j.id?.toLowerCase().includes(q) || bookingRef.includes(q);
       const nameMatch = (j.passengerName ?? "").toLowerCase().includes(q);
       const vehicleMatch = (j.vehicleNumber ?? "").toLowerCase().includes(q);
       return idMatch || nameMatch || vehicleMatch;
@@ -61,7 +61,7 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
   const renderItem = ({ item }: { item: DriverJob }) => {
     const fareValue =
       typeof item.paymentAmount === "number" ? item.paymentAmount : 0;
-    const shortRef = shortBookingRef(item.id);
+    const bookingRef = formatBookingRef(item.id, item.source);
     const pickupTime = item.scheduledTime
       ? new Date(item.scheduledTime).toLocaleString()
       : "—";
@@ -88,7 +88,7 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
       >
         <View style={styles.cardLeft}>
           <Text style={styles.jobId} numberOfLines={1} ellipsizeMode="tail">
-            {shortRef}
+            {bookingRef}
           </Text>
           <Text style={styles.passenger} numberOfLines={1} ellipsizeMode="tail">
             {item.passengerName}

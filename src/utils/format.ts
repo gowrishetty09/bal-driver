@@ -47,7 +47,7 @@ export const formatBookingRef = (
     options?: { includeHash?: boolean; defaultSource?: string | null }
 ): string => {
     const includeHash = options?.includeHash ?? true;
-    const effectiveSource = source ?? options?.defaultSource ?? 'DRIVER_APP';
+    const effectiveSource = source ?? options?.defaultSource ?? null;
     const empty = '—';
     if (!idOrRef) return empty;
 
