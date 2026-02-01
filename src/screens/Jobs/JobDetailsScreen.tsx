@@ -40,7 +40,11 @@ import {
 } from "../../utils/toast";
 import { emitJobRefresh } from "../../utils/events";
 import { socketService } from "../../services/socketService";
-import { formatMYR, formatBookingRef, bookingRefFull } from "../../utils/format";
+import {
+  formatMYR,
+  formatBookingRef,
+  bookingRefFull,
+} from "../../utils/format";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -1322,7 +1326,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.jobId}>{formatBookingRef(job.id, job.source)}</Text>
+            <Text style={styles.jobId}>
+              {formatBookingRef(job.id, job.source)}
+            </Text>
             <Text style={[styles.subtle, { marginTop: 6 }]}>
               Vehicle: {job.vehiclePlate ?? "—"}
             </Text>
@@ -2247,6 +2253,8 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
+      color: colors.text,
+      backgroundColor: colors.background,
       minHeight: 100,
       padding: 12,
       marginTop: 16,

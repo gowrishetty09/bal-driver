@@ -41,7 +41,7 @@ const buildWeekDays = () => {
   const days: Date[] = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   // Show 3 days before + today + 3 days after (7 days centered on today)
   // This ensures upcoming bookings for tomorrow/next few days are visible
   for (let i = -3; i <= 3; i++) {
@@ -70,8 +70,7 @@ export const HomeDashboardScreen: React.FC = () => {
   const upcoming = useRealtimeJobs("UPCOMING");
   const history = useRealtimeJobs("HISTORY");
 
-  const isLoading =
-    active.isLoading || upcoming.isLoading || history.isLoading;
+  const isLoading = active.isLoading || upcoming.isLoading || history.isLoading;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -95,7 +94,7 @@ export const HomeDashboardScreen: React.FC = () => {
 
     const earnings = history.bookings.reduce(
       (sum, job) => sum + getJobAmount(job),
-      0
+      0,
     );
 
     // Rating is not currently present in DriverUser; keep placeholder until backend provides it.
@@ -115,11 +114,9 @@ export const HomeDashboardScreen: React.FC = () => {
     const all = [...active.bookings, ...upcoming.bookings, ...history.bookings];
     // Deduplicate by job ID
     const uniqueJobs = Array.from(
-      new Map(all.map((job) => [job.id, job])).values()
+      new Map(all.map((job) => [job.id, job])).values(),
     );
-    return uniqueJobs
-      .sort((a, b) => getJobTime(b) - getJobTime(a))
-      .slice(0, 3);
+    return uniqueJobs.sort((a, b) => getJobTime(b) - getJobTime(a)).slice(0, 3);
   }, [active.bookings, upcoming.bookings, history.bookings]);
 
   const weeklyCounts = useMemo(() => {
@@ -128,7 +125,11 @@ export const HomeDashboardScreen: React.FC = () => {
     days.forEach((d) => byDay.set(dayKey(d), 0));
 
     // Include all bookings (active, upcoming, and history) in the weekly count
-    const allBookings = [...active.bookings, ...upcoming.bookings, ...history.bookings];
+    const allBookings = [
+      ...active.bookings,
+      ...upcoming.bookings,
+      ...history.bookings,
+    ];
     allBookings.forEach((job) => {
       const t = Date.parse(job.scheduledTime ?? "");
       if (!Number.isFinite(t)) return;
@@ -193,19 +194,20 @@ export const HomeDashboardScreen: React.FC = () => {
           styles={styles}
         />
         <StatCard
-          title="Earnings"
-          value={formatCurrencyMYR(stats.earnings)}
-          icon="cash-outline"
-          accent={colors.accent}
-          colors={colors}
-          styles={styles}
-        />
-        <StatCard
           title="Active"
           value={String(stats.activeCount) || "0"}
           icon="navigate-circle-outline"
           accent={colors.primary}
           onPress={() => goToRides("ACTIVE")}
+          colors={colors}
+          styles={styles}
+        />
+        <StatCard
+          title="Upcoming"
+          value={String(stats.upcomingCount) || "0"}
+          icon="time-outline"
+          accent={colors.accent}
+          onPress={() => goToRides("UPCOMING")}
           colors={colors}
           styles={styles}
         />
@@ -247,7 +249,12 @@ export const HomeDashboardScreen: React.FC = () => {
                       ]}
                     />
                   </View>
-                  <Text style={[styles.chartLabel, isToday && styles.chartLabelToday]}>
+                  <Text
+                    style={[
+                      styles.chartLabel,
+                      isToday && styles.chartLabelToday,
+                    ]}
+                  >
                     {d.label}
                   </Text>
                 </View>
@@ -293,7 +300,8 @@ export const HomeDashboardScreen: React.FC = () => {
                     #{job.id.slice(-8)}
                   </Text>
                   <Text style={styles.recentRoute} numberOfLines={1}>
-                    {(job.pickup?.addressLine ?? "—") + " → " +
+                    {(job.pickup?.addressLine ?? "—") +
+                      " → " +
                       (job.dropoff?.addressLine ?? "—")}
                   </Text>
                 </View>
@@ -312,11 +320,21 @@ export const HomeDashboardScreen: React.FC = () => {
       </View>
 
       <View style={styles.quickRow}>
-        <Pressable style={styles.quickButton} onPress={() => goToRides("UPCOMING")}>
-          <Ionicons name="calendar-outline" size={18} color={colors.brandNavy} />
+        <Pressable
+          style={styles.quickButton}
+          onPress={() => goToRides("UPCOMING")}
+        >
+          <Ionicons
+            name="calendar-outline"
+            size={18}
+            color={colors.brandNavy}
+          />
           <Text style={styles.quickButtonText}>Upcoming</Text>
         </Pressable>
-        <Pressable style={styles.quickButton} onPress={() => goToRides("HISTORY")}>
+        <Pressable
+          style={styles.quickButton}
+          onPress={() => goToRides("HISTORY")}
+        >
           <Ionicons name="time-outline" size={18} color={colors.brandNavy} />
           <Text style={styles.quickButtonText}>History</Text>
         </Pressable>
@@ -340,7 +358,7 @@ const StatCard: React.FC<{
   const content = (
     <View style={[styles.statCard, { borderColor: accent }]}>
       <View style={styles.statTop}>
-        <View style={[styles.statIconWrap, { backgroundColor: accent }]}> 
+        <View style={[styles.statIconWrap, { backgroundColor: accent }]}>
           <Ionicons name={icon} size={18} color={colors.brandNavy} />
         </View>
         <Text style={styles.statTitle} numberOfLines={1}>
@@ -365,242 +383,243 @@ const StatCard: React.FC<{
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-  },
-  headerRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  headerTitle: {
-    fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-  },
-  headerSubtitle: {
-    marginTop: 2,
-    fontSize: typography.caption,
-    color: colors.muted,
-  },
-  viewAllPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.brandGold,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  viewAllPillText: {
-    color: colors.brandNavy,
-    fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  loadingRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  loadingText: {
-    color: colors.muted,
-    fontSize: typography.caption,
-  },
-  cardsGrid: {
-    marginTop: 14,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 12,
-  },
-  statCard: {
-    width: "48.5%",
-    minWidth: 150,
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-  },
-  statTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  statIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statTitle: {
-    flex: 1,
-    fontSize: typography.caption,
-    color: colors.muted,
-    textAlign: "right",
-  },
-  statValue: {
-    marginTop: 10,
-    fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-  },
-  section: {
-    marginTop: 18,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-  },
-  sectionAction: {
-    fontSize: typography.caption,
-    color: colors.highlight,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  chartCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chartRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  chartCol: {
-    flex: 1,
-    alignItems: "center",
-  },
-  chartBarWrap: {
-    height: 90,
-    width: "100%",
-    backgroundColor: colors.cardSecondary,
-    borderRadius: 10,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  chartBar: {
-    width: "100%",
-    backgroundColor: colors.brandGold,
-    borderRadius: 10,
-  },
-  chartBarToday: {
-    backgroundColor: colors.primary,
-  },
-  chartValue: {
-    fontSize: 11,
-    fontFamily: typography.fontFamilyBold,
-    color: colors.text,
-    marginBottom: 4,
-  },
-  chartLabel: {
-    marginTop: 8,
-    fontSize: 10,
-    color: colors.muted,
-  },
-  chartLabelToday: {
-    color: colors.primary,
-    fontFamily: typography.fontFamilyBold,
-  },
-  emptyCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: typography.body,
-  },
-  primaryButton: {
-    marginTop: 12,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  primaryButtonText: {
-    color: colors.textInverse,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  recentList: {
-    gap: 10,
-  },
-  recentItem: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  recentItemPressed: {
-    transform: [{ scale: 0.99 }],
-  },
-  recentLeft: {
-    flex: 1,
-  },
-  recentRight: {
-    alignItems: "flex-end",
-  },
-  recentRef: {
-    fontSize: typography.caption,
-    color: colors.highlight,
-    fontFamily: typography.fontFamilyBold,
-  },
-  recentRoute: {
-    marginTop: 4,
-    fontSize: typography.caption,
-    color: colors.muted,
-  },
-  recentStatus: {
-    fontSize: typography.caption,
-    color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
-  },
-  recentTime: {
-    marginTop: 4,
-    fontSize: 10,
-    color: colors.muted,
-  },
-  quickRow: {
-    marginTop: 18,
-    flexDirection: "row",
-    gap: 12,
-  },
-  quickButton: {
-    flex: 1,
-    backgroundColor: colors.brandGold,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  quickButtonText: {
-    color: colors.brandNavy,
-    fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      paddingHorizontal: 16,
+    },
+    headerRow: {
+      marginTop: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    headerTitle: {
+      fontSize: typography.heading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+    },
+    headerSubtitle: {
+      marginTop: 2,
+      fontSize: typography.caption,
+      color: colors.muted,
+    },
+    viewAllPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.brandGold,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    viewAllPillText: {
+      color: colors.brandNavy,
+      fontSize: typography.caption,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    loadingRow: {
+      marginTop: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    loadingText: {
+      color: colors.muted,
+      fontSize: typography.caption,
+    },
+    cardsGrid: {
+      marginTop: 14,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      rowGap: 12,
+    },
+    statCard: {
+      width: "48.5%",
+      minWidth: 150,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+    },
+    statTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    statIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    statTitle: {
+      flex: 1,
+      fontSize: typography.caption,
+      color: colors.muted,
+      textAlign: "right",
+    },
+    statValue: {
+      marginTop: 10,
+      fontSize: typography.subheading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+    },
+    section: {
+      marginTop: 18,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+    sectionTitle: {
+      fontSize: typography.subheading,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+    },
+    sectionAction: {
+      fontSize: typography.caption,
+      color: colors.highlight,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    chartCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chartRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    chartCol: {
+      flex: 1,
+      alignItems: "center",
+    },
+    chartBarWrap: {
+      height: 90,
+      width: "100%",
+      backgroundColor: colors.cardSecondary,
+      borderRadius: 10,
+      overflow: "hidden",
+      justifyContent: "flex-end",
+    },
+    chartBar: {
+      width: "100%",
+      backgroundColor: colors.brandGold,
+      borderRadius: 10,
+    },
+    chartBarToday: {
+      backgroundColor: colors.primary,
+    },
+    chartValue: {
+      fontSize: 11,
+      fontFamily: typography.fontFamilyBold,
+      color: colors.text,
+      marginBottom: 4,
+    },
+    chartLabel: {
+      marginTop: 8,
+      fontSize: 10,
+      color: colors.muted,
+    },
+    chartLabelToday: {
+      color: colors.primary,
+      fontFamily: typography.fontFamilyBold,
+    },
+    emptyCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    emptyText: {
+      color: colors.muted,
+      fontSize: typography.body,
+    },
+    primaryButton: {
+      marginTop: 12,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    primaryButtonText: {
+      color: colors.textInverse,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    recentList: {
+      gap: 10,
+    },
+    recentItem: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    recentItemPressed: {
+      transform: [{ scale: 0.99 }],
+    },
+    recentLeft: {
+      flex: 1,
+    },
+    recentRight: {
+      alignItems: "flex-end",
+    },
+    recentRef: {
+      fontSize: typography.caption,
+      color: colors.highlight,
+      fontFamily: typography.fontFamilyBold,
+    },
+    recentRoute: {
+      marginTop: 4,
+      fontSize: typography.caption,
+      color: colors.muted,
+    },
+    recentStatus: {
+      fontSize: typography.caption,
+      color: colors.text,
+      fontFamily: typography.fontFamilyMedium,
+    },
+    recentTime: {
+      marginTop: 4,
+      fontSize: 10,
+      color: colors.muted,
+    },
+    quickRow: {
+      marginTop: 18,
+      flexDirection: "row",
+      gap: 12,
+    },
+    quickButton: {
+      flex: 1,
+      backgroundColor: colors.brandGold,
+      borderRadius: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    quickButtonText: {
+      color: colors.brandNavy,
+      fontSize: typography.body,
+      fontFamily: typography.fontFamilyMedium,
+    },
+  });
