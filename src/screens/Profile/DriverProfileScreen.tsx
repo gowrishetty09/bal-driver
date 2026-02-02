@@ -16,6 +16,7 @@ import { Screen } from "../../components/Screen";
 import { useAuth } from "../../hooks/useAuth";
 import { useLocationService } from "../../hooks/useLocationService";
 import { changeDriverPassword } from "../../api/passwordReset";
+import { updateDriverProfile } from "../../api/driver";
 import { useTheme } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { getErrorMessage } from "../../utils/errors";
@@ -146,16 +147,28 @@ export const DriverProfileScreen: React.FC = () => {
       showErrorToast("Error", "Name cannot be empty.");
       return;
     }
+    if (!user?.id) {
+      showErrorToast("Error", "User not found. Please log in again.");
+      return;
+    }
     setIsSavingProfile(true);
     try {
+      // Call API to update profile on the server
+      const updatedDriver = await updateDriverProfile(user.id, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+        phone: editPhone.trim(),
+        licenseNumber: editLicenseNumber.trim(),
+      });
+      // Update local state with server response
       await updateUserProfile((prev) =>
         prev
           ? {
               ...prev,
-              name: editName.trim(),
-              email: editEmail.trim(),
-              phone: editPhone.trim(),
-              licenseNumber: editLicenseNumber.trim(),
+              name: updatedDriver.name || editName.trim(),
+              email: updatedDriver.email || editEmail.trim(),
+              phone: updatedDriver.phone || editPhone.trim(),
+              licenseNumber: updatedDriver.licenseNumber || editLicenseNumber.trim(),
               status: editStatus,
             }
           : prev

@@ -511,3 +511,37 @@ export const registerDeviceToken = async (payload: RegisterDeviceTokenPayload): 
         throw error;
     }
 };
+
+/**
+ * Update driver profile payload
+ */
+export type UpdateDriverProfilePayload = {
+    name?: string;
+    email?: string;
+    phone?: string;
+    licenseNumber?: string;
+};
+
+/**
+ * Update the authenticated driver's profile
+ */
+export const updateDriverProfile = async (driverId: string, payload: UpdateDriverProfilePayload): Promise<DriverUser> => {
+    try {
+        const response = await apiClient.patch<DriverUser>(`/drivers/${driverId}`, payload);
+        return response.data;
+    } catch (error) {
+        if (shouldUseMocks()) {
+            return { ...mockUser, ...payload };
+        }
+        if (axios.isAxiosError(error)) {
+            console.error('Failed to update driver profile:', {
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message,
+            });
+        } else {
+            console.error('Failed to update driver profile:', error);
+        }
+        throw error;
+    }
+};

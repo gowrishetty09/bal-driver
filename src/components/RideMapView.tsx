@@ -134,15 +134,21 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   pickupAddress,
   dropAddress,
   fullScreen = false,
-  estimatedTime,
-  estimatedDistance,
+  estimatedTime: propEstimatedTime,
+  estimatedDistance: propEstimatedDistance,
 }) => {
   const { colors } = useTheme();
   const mapRef = useRef<MapView>(null);
   const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [routeIsDirections, setRouteIsDirections] = useState(false);
+  const [liveEtaTime, setLiveEtaTime] = useState<string | null>(null);
+  const [liveEtaDistance, setLiveEtaDistance] = useState<string | null>(null);
   const lastRouteFetchRef = useRef<{ ts: number; origin: string; destination: string } | null>(null);
   const hasFittedMapRef = useRef(false);
+
+  // Use live ETA if available, otherwise fall back to props
+  const estimatedTime = liveEtaTime ?? propEstimatedTime;
+  const estimatedDistance = liveEtaDistance ?? propEstimatedDistance;
 
   // Extract and validate coordinates
   const driverLatLng = extractDriverLatLng(driverLocation);
@@ -205,6 +211,15 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
           setRoutePoints(decoded);
           setRouteIsDirections(true);
           lastRouteFetchRef.current = { ts: now, origin: originKey, destination: destKey };
+          
+          // Extract live ETA from directions response
+          const leg = json.routes[0].legs?.[0];
+          if (leg?.duration?.text) {
+            setLiveEtaTime(leg.duration.text);
+          }
+          if (leg?.distance?.text) {
+            setLiveEtaDistance(leg.distance.text);
+          }
           return;
         }
 

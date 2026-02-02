@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { Screen } from "../../components/Screen";
 import { FeedbackPrompt } from "../../components/FeedbackPrompt";
@@ -116,6 +117,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [pickupCode, setPickupCode] = useState("");
   const [awaitingRideStartConfirmation, setAwaitingRideStartConfirmation] =
     useState(false);
+  const pickupCodeInputRef = useRef<TextInput>(null);
 
   const canSubmitPickupCode = useMemo(() => {
     const normalized = pickupCode.trim();
@@ -1078,34 +1080,66 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           transparent
         >
           <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard}>
-              <Text style={styles.sectionTitle}>Enter Pickup Code</Text>
-              <Text style={styles.subtle}>
-                Ask the customer for the pickup code to start the ride.
-              </Text>
-              {awaitingRideStartConfirmation && (
-                <Text style={styles.subtle}>
-                  Code accepted. Waiting for confirmation…
+            <View style={styles.pickupCodeModalCard}>
+              <View style={styles.pickupCodeHeader}>
+                <View style={styles.pickupCodeIconContainer}>
+                  <Ionicons name="keypad" size={24} color={colors.primary} />
+                </View>
+                <Text style={styles.pickupCodeTitle}>Enter Pickup Code</Text>
+                <Text style={styles.pickupCodeSubtitle}>
+                  Ask the customer for the {PICKUP_CODE_LENGTH}-digit code to start the ride
                 </Text>
+              </View>
+              
+              {awaitingRideStartConfirmation && (
+                <View style={styles.pickupCodeSuccess}>
+                  <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
+                  <Text style={styles.pickupCodeSuccessText}>
+                    Code verified. Starting ride…
+                  </Text>
+                </View>
               )}
-              <TextInput
-                style={styles.modalInput}
-                placeholder={`Enter ${PICKUP_CODE_LENGTH}-digit code`}
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                value={pickupCode}
-                onChangeText={(value) => {
-                  const digitsOnly = value
-                    .replace(/[^0-9]/g, "")
-                    .slice(0, PICKUP_CODE_LENGTH);
-                  setPickupCode(digitsOnly);
-                }}
-                maxLength={PICKUP_CODE_LENGTH}
-                editable={!actionLoading && !awaitingRideStartConfirmation}
-              />
-              <View style={styles.modalActions}>
+              
+              {/* OTP-style digit boxes */}
+              <View style={styles.pickupCodeInputWrapper}>
+                <View style={styles.pickupCodeDigitsContainer}>
+                  {Array.from({ length: PICKUP_CODE_LENGTH }).map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.pickupCodeDigitBox,
+                        pickupCode[index] ? styles.pickupCodeDigitBoxFilled : {},
+                      ]}
+                    >
+                      <Text style={styles.pickupCodeDigitText}>
+                        {pickupCode[index] || ""}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                
+                {/* TextInput overlaying digit boxes */}
+                <TextInput
+                  ref={pickupCodeInputRef}
+                  style={styles.pickupCodeHiddenInput}
+                  keyboardType="number-pad"
+                  value={pickupCode}
+                  onChangeText={(value) => {
+                    const digitsOnly = value
+                      .replace(/[^0-9]/g, "")
+                      .slice(0, PICKUP_CODE_LENGTH);
+                    setPickupCode(digitsOnly);
+                  }}
+                  maxLength={PICKUP_CODE_LENGTH}
+                  editable={!actionLoading && !awaitingRideStartConfirmation}
+                  autoFocus
+                  caretHidden
+                />
+              </View>
+              
+              <View style={styles.pickupCodeActions}>
                 <Pressable
-                  style={styles.modalSecondary}
+                  style={styles.pickupCodeCancelBtn}
                   onPress={() => {
                     if (awaitingRideStartConfirmation) {
                       return;
@@ -1115,10 +1149,13 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   }}
                   disabled={actionLoading || awaitingRideStartConfirmation}
                 >
-                  <Text style={styles.secondaryActionLabel}>Cancel</Text>
+                  <Text style={styles.pickupCodeCancelText}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={styles.modalPrimary}
+                  style={[
+                    styles.pickupCodeVerifyBtn,
+                    pickupCode.length < PICKUP_CODE_LENGTH && styles.pickupCodeVerifyBtnDisabled,
+                  ]}
                   onPress={() => {
                     if (!job) return;
                     if (awaitingRideStartConfirmation) return;
@@ -2279,5 +2316,114 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.primary,
       alignItems: "center",
       paddingVertical: 12,
+    },
+    // Pickup Code Modal Styles
+    pickupCodeModalCard: {
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      padding: 24,
+      alignItems: "center",
+    },
+    pickupCodeHeader: {
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    pickupCodeIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: "rgba(82, 196, 26, 0.1)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    pickupCodeTitle: {
+      fontSize: 20,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.text,
+      marginBottom: 6,
+    },
+    pickupCodeSubtitle: {
+      fontSize: 14,
+      fontFamily: typography.fontFamilyRegular,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    pickupCodeSuccess: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 8,
+    },
+    pickupCodeSuccessText: {
+      fontSize: 14,
+      fontFamily: typography.fontFamilyMedium,
+      color: "#52c41a",
+    },
+    pickupCodeDigitsContainer: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    pickupCodeInputWrapper: {
+      position: "relative",
+      marginBottom: 24,
+    },
+    pickupCodeDigitBox: {
+      width: 40,
+      height: 48,
+      borderRadius: 8,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pickupCodeDigitBoxFilled: {
+      borderColor: colors.primary,
+      backgroundColor: "rgba(24, 144, 255, 0.05)",
+    },
+    pickupCodeDigitText: {
+      fontSize: 22,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.text,
+    },
+    pickupCodeHiddenInput: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      opacity: 0,
+      fontSize: 22,
+    },
+    pickupCodeActions: {
+      flexDirection: "row",
+      gap: 12,
+      width: "100%",
+    },
+    pickupCodeCancelBtn: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+    },
+    pickupCodeCancelText: {
+      fontSize: 15,
+      fontFamily: typography.fontFamilyMedium,
+      color: colors.textSecondary,
+    },
+    pickupCodeVerifyBtn: {
+      flex: 1,
+      borderRadius: 12,
+      backgroundColor: "#52c41a",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+    },
+    pickupCodeVerifyBtnDisabled: {
+      backgroundColor: colors.border,
     },
   });
