@@ -605,7 +605,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     },
     subtitle: {
       fontSize: typography.body,
-      color: colors.muted,
+      color: colors.textSecondary,
       marginTop: 4,
     },
     badgesRow: {

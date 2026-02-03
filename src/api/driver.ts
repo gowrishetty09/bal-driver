@@ -89,6 +89,30 @@ export type LoginPayload = {
     password: string;
 };
 
+// Backend returns this shape from /auth/login
+export type BackendLoginUser = {
+    id: string;
+    email: string;
+    role: string;
+    displayName: string;
+    driverId?: string;
+    // Driver-specific fields returned by backend
+    name?: string;
+    phone?: string;
+    licenseNumber?: string;
+    vehicleNumber?: string;
+    status?: string;
+    lastLocation?: {
+        latitude: number;
+        longitude: number;
+        updatedAt?: string | null;
+    } | null;
+};
+
+export type BackendLoginResponse = TokenResponse & {
+    user: BackendLoginUser;
+};
+
 export type LoginResponse = TokenResponse & {
     user: DriverUser;
 };
@@ -118,7 +142,7 @@ type ErrorResponse = {
 
 export const loginDriver = async (payload: LoginPayload): Promise<AuthenticatedDriverPayload> => {
     try {
-        const { data } = await authHttp.post<LoginResponse | ErrorResponse>('/auth/login', payload);
+        const { data } = await authHttp.post<BackendLoginResponse | ErrorResponse>('/auth/login', payload);
 
         // Check if response is an error (backend returns 201 even for errors)
         const errorData = data as ErrorResponse;
@@ -126,13 +150,31 @@ export const loginDriver = async (payload: LoginPayload): Promise<AuthenticatedD
             throw new Error(errorData.message);
         }
 
-        const loginData = data as LoginResponse;
+        const loginData = data as BackendLoginResponse;
         if (!loginData.accessToken || !loginData.user) {
             throw new Error('Invalid login response');
         }
 
+        // Map backend response to DriverUser format
+        const backendUser = loginData.user;
+        const user: DriverUser = {
+            id: backendUser.driverId ?? backendUser.id,
+            name: backendUser.name ?? backendUser.displayName ?? '',
+            email: backendUser.email,
+            phone: backendUser.phone,
+            licenseNumber: backendUser.licenseNumber,
+            role: backendUser.role,
+            vehicleNumber: backendUser.vehicleNumber,
+            status: backendUser.status,
+            lastLocation: backendUser.lastLocation ? {
+                latitude: backendUser.lastLocation.latitude,
+                longitude: backendUser.lastLocation.longitude,
+                updatedAt: backendUser.lastLocation.updatedAt ?? ''
+            } : undefined
+        };
+
         const tokens = deriveSessionTokens(loginData, Date.now());
-        return { tokens, user: loginData.user };
+        return { tokens, user };
     } catch (error) {
         if (shouldUseMocks()) {
             return mockLogin(payload);

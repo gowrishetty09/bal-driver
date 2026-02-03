@@ -150,7 +150,7 @@ export const darkTheme: ThemeColors = {
   primaryLight: '#E5E5E5',
   accent: '#BD9250',
   highlight: '#D4A853',
-  brandNavy: '#151e2d',
+  brandNavy: 'rgba(255, 255, 255, 0.9)',
   brandGold: '#BD9250',
   
   // Map specific
