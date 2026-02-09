@@ -197,7 +197,7 @@ export const HomeDashboardScreen: React.FC = () => {
           title="Active"
           value={String(stats.activeCount) || "0"}
           icon="navigate-circle-outline"
-          accent={colors.primary}
+          accent={colors.brandGold}
           onPress={() => goToRides("ACTIVE")}
           colors={colors}
           styles={styles}
@@ -206,7 +206,7 @@ export const HomeDashboardScreen: React.FC = () => {
           title="Upcoming"
           value={String(stats.upcomingCount) || "0"}
           icon="time-outline"
-          accent={colors.accent}
+          accent={colors.brandGold}
           onPress={() => goToRides("UPCOMING")}
           colors={colors}
           styles={styles}

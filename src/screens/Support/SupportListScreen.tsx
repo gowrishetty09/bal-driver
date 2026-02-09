@@ -221,7 +221,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderRadius: 999,
   },
   statusLabel: {
-    color: "#fff",
+    color: colors.textInverse,
     fontSize: typography.caption,
     fontFamily: typography.fontFamilyMedium,
   },

@@ -132,7 +132,7 @@ export const darkTheme: ThemeColors = {
   textSecondary: '#B3B3B3',
   textMuted: '#666666',
   textInverse: '#151e2d',
-  muted: '#666666',
+  muted: '#919191',
   
   // UI elements
   border: '#333333',
