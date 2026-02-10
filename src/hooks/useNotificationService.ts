@@ -191,6 +191,15 @@ export const useNotificationService = () => {
             return;
         }
 
+        // Ensure default channel exists and is high-importance.
+        // Many backend notifications will not specify a channelId, and Android will route them to "default".
+        await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default',
+            description: 'General notifications',
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: 'default',
+        });
+
         // Create channels for different notification types
         await Notifications.setNotificationChannelAsync('rides', {
             name: 'Ride Notifications',
@@ -334,6 +343,15 @@ export const useNotificationService = () => {
                 try {
                     const nativeTokenData = await Notifications.getDevicePushTokenAsync();
                     console.log('Native device push token (diagnostics):', { data: nativeTokenData.data, type: (nativeTokenData as any).type });
+
+                    // Fallback registration: also register the native token.
+                    // This helps when Expo push token delivery is affected by projectId/config issues.
+                    if (nativeTokenData?.data) {
+                        const nativeToken = String(nativeTokenData.data);
+                        if (nativeToken) {
+                            await registerPushToken(nativeToken);
+                        }
+                    }
                 } catch (err) {
                     console.warn('Failed to get native device push token (diagnostics):', err);
                 }
