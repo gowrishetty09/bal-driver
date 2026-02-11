@@ -139,6 +139,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   // Determine if map should be shown (active ride statuses only)
   const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
 
+  const canMarkNoShow =
+    !!job && (job.status === "ASSIGNED" || job.status === "EN_ROUTE" || job.status === "ARRIVED");
+
   const pickupProximity = useMemo(() => {
     try {
       const hasDriverCoords = !!lastKnownCoordinates;
@@ -679,6 +682,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   }, [cancelReason, handleStatusUpdate]);
 
   const confirmNoShow = useCallback(() => {
+    if (!canMarkNoShow) {
+      showInfoToast(
+        "No Show",
+        "No Show can only be marked before starting the ride."
+      );
+      setNoShowModalVisible(false);
+      return;
+    }
     if (!noShowReason.trim()) {
       Alert.alert(
         "Reason required",
@@ -687,7 +698,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       return;
     }
     handleStatusUpdate("NO_SHOW" as JobStatus, noShowReason.trim());
-  }, [noShowReason, handleStatusUpdate]);
+  }, [canMarkNoShow, noShowReason, handleStatusUpdate]);
 
   const formatDateTime = useCallback((value?: string) => {
     if (!value) {
@@ -1057,12 +1068,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               </Pressable>
             )}
             <View style={styles.overlaySecondaryActions}>
-              <Pressable
-                style={styles.overlayNoShowAction}
-                onPress={() => setNoShowModalVisible(true)}
-              >
-                <Text style={styles.overlayNoShowActionLabel}>No Show</Text>
-              </Pressable>
+              {canMarkNoShow && (
+                <Pressable
+                  style={styles.overlayNoShowAction}
+                  onPress={() => setNoShowModalVisible(true)}
+                >
+                  <Text style={styles.overlayNoShowActionLabel}>No Show</Text>
+                </Pressable>
+              )}
               <Pressable
                 style={styles.overlayCancelAction}
                 onPress={() => setCancelModalVisible(true)}
@@ -1598,12 +1611,14 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             )}
 
             <View style={styles.secondaryActionsRow}>
-              <Pressable
-                style={styles.secondaryActionNoShow}
-                onPress={() => setNoShowModalVisible(true)}
-              >
-                <Text style={styles.secondaryActionNoShowLabel}>No Show</Text>
-              </Pressable>
+              {canMarkNoShow && (
+                <Pressable
+                  style={styles.secondaryActionNoShow}
+                  onPress={() => setNoShowModalVisible(true)}
+                >
+                  <Text style={styles.secondaryActionNoShowLabel}>No Show</Text>
+                </Pressable>
+              )}
               <Pressable
                 style={styles.secondaryAction}
                 onPress={() => setCancelModalVisible(true)}
