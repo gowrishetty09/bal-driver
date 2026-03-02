@@ -57,7 +57,7 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "https://bestaerolimo.online/api",
+      "apiBaseUrl": "https://bestaerolimo.com/api",
       "useMocks": false,
       "googlePlacesApiKey": "AIzaSyDRN3_J4mGdkmWifoACmHBfT68sIvD3kQ8",
       "sosContacts": {

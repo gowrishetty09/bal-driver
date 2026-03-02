@@ -12,7 +12,7 @@ const fromEnv = (key: string, fallback?: string) => {
 };
 
 export const API_BASE_URL: string =
-    process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://bestaerolimo.online/api';
+    process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://bestaerolimo.com/api';
 
 const normalizeSocketBaseUrl = (raw: string, apiBaseUrl: string): string => {
     const fallback = apiBaseUrl.replace(/\/api\/?$/i, '').replace(/\/$/, '');
