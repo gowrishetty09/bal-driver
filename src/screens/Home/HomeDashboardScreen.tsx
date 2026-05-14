@@ -309,7 +309,7 @@ export const HomeDashboardScreen: React.FC = () => {
                   <Text style={styles.recentStatus}>{job.status}</Text>
                   <Text style={styles.recentTime}>
                     {job.scheduledTime
-                      ? new Date(job.scheduledTime).toLocaleString()
+                      ? new Date(job.scheduledTime).toLocaleString("en-MY", { hour12: false })
                       : "—"}
                   </Text>
                 </View>

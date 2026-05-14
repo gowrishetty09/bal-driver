@@ -116,7 +116,7 @@ export const SupportTicketDetailsScreen: React.FC<Props> = ({ route }) => {
                 </Text>
                 <Text style={[styles.messageBody, isDriver ? styles.driverText : styles.dispatchText]}>{messageText}</Text>
                 <Text style={[styles.messageTimestamp, isDriver ? styles.driverText : styles.dispatchText]}>
-                  {new Date(item.createdAt).toLocaleString()}
+                  {new Date(item.createdAt).toLocaleString("en-MY", { hour12: false })}
                 </Text>
               </View>
             );

@@ -2,7 +2,7 @@
   "expo": {
     "name": "BAL Driver",
     "slug": "bal-driver",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/AppIcons/playstore.png",
     "userInterfaceStyle": "light",
@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.bal.driver",
-      "versionCode": 20,
+      "versionCode": 21,
       "adaptiveIcon": {
         "foregroundImage": "./assets/AppIcons/playstore.png",
         "backgroundColor": "#151e2d"

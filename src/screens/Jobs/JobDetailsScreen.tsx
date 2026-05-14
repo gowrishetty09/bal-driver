@@ -704,7 +704,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     if (!value) {
       return "—";
     }
-    return new Date(value).toLocaleString();
+    return new Date(value).toLocaleString("en-MY", { hour12: false });
   }, []);
 
   const timelineItems = useMemo(() => job?.timeline ?? [], [job]);

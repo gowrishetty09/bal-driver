@@ -25,6 +25,7 @@ const formatDateTime = (iso: string) => {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   })}`;
 };
 

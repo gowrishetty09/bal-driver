@@ -95,7 +95,7 @@ export const FeedbackPrompt: React.FC<FeedbackPromptProps> = ({
   const formatDateTime = useCallback((dateString: string) => {
     const date = new Date(dateString);
     const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
     return `${day} at ${time}`;
   }, []);
 

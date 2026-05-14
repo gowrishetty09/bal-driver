@@ -112,7 +112,7 @@ export const RidesScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.cardFooter}>
         <Text style={styles.time}>
           {item.scheduledTime
-            ? new Date(item.scheduledTime).toLocaleString()
+            ? new Date(item.scheduledTime).toLocaleString("en-MY", { hour12: false })
             : "—"}
         </Text>
         <Text style={styles.tapHint}>Tap to view →</Text>

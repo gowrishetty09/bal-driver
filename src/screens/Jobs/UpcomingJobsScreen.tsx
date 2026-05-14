@@ -56,7 +56,7 @@ export const UpcomingJobsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.rightContent}>
         <Text style={styles.label}>Pickup</Text>
         <Text style={styles.value}>
-          {new Date(item.scheduledTime).toLocaleTimeString()}
+          {new Date(item.scheduledTime).toLocaleTimeString("en-MY", { hour12: false })}
         </Text>
       </View>
     </Pressable>

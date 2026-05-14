@@ -73,7 +73,7 @@ const friendlyTime = (timestamp?: string | null) => {
   if (hours < 24) {
     return `${hours} hour${hours > 1 ? "s" : ""} ago`;
   }
-  return new Date(timestamp).toLocaleString();
+  return new Date(timestamp).toLocaleString("en-MY", { hour12: false });
 };
 
 export const DriverProfileScreen: React.FC = () => {

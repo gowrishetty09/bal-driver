@@ -72,7 +72,7 @@ export const ForgotPasswordResetScreen: React.FC<Props> = ({ route, navigation }
                     <Text style={styles.heroEyebrow}>Create a new password</Text>
                     <Text style={styles.heroTitle}>Choose something unique you have not used before</Text>
                     {expiresAt ? (
-                        <Text style={styles.heroSubtitle}>Reset link remains active until {new Date(expiresAt).toLocaleTimeString()}.</Text>
+                        <Text style={styles.heroSubtitle}>Reset link remains active until {new Date(expiresAt).toLocaleTimeString("en-MY", { hour12: false })}.</Text>
                     ) : (
                         <Text style={styles.heroSubtitle}>For your safety this step expires quickly. Complete it now.</Text>
                     )}

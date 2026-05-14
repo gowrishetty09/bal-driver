@@ -63,7 +63,7 @@ export const HistoryJobsScreen: React.FC<Props> = ({ navigation }) => {
       typeof item.paymentAmount === "number" ? item.paymentAmount : 0;
     const bookingRef = formatBookingRef(item.id, item.source);
     const pickupTime = item.scheduledTime
-      ? new Date(item.scheduledTime).toLocaleString()
+      ? new Date(item.scheduledTime).toLocaleString("en-MY", { hour12: false })
       : "—";
     // Drop time not always available in summary list
     const dropTime = "—";

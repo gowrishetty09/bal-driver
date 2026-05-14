@@ -63,7 +63,7 @@ export const ActiveJobsScreen: React.FC<Props> = ({ navigation }) => {
       }`}</Text>
       <View style={styles.cardFooter}>
         <Text style={styles.eta}>
-          {new Date(item.scheduledTime).toLocaleTimeString()}
+          {new Date(item.scheduledTime).toLocaleTimeString("en-MY", { hour12: false })}
         </Text>
         <Text style={styles.tapHint}>Tap to view details →</Text>
       </View>

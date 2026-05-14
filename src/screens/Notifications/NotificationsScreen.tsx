@@ -20,7 +20,7 @@ export const NotificationsScreen: React.FC = () => {
 
   const formatDate = (timestamp: number) => {
     try {
-      return new Date(timestamp).toLocaleString();
+      return new Date(timestamp).toLocaleString("en-MY", { hour12: false });
     } catch {
       return "";
     }

@@ -68,6 +68,10 @@ export const getNotificationType = (data?: Record<string, string | number | bool
             return 'SOS_MESSAGE';
         case 'DRIVER_REASSIGNED':
         case 'ADMIN_UPDATE':
+        case 'STATUS_ACTION_REQUIRED':
+            // STATUS_ACTION_REQUIRED is sent (among other things) when an
+            // admin/hotel changes the vehicle category for a booking, which
+            // unassigns the current driver. Route it like an admin update.
             return 'ADMIN_REASSIGNMENT';
         default:
             return 'NEW_RIDE';
