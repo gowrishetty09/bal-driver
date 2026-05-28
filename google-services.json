@@ -1,13 +1,51 @@
 {
   "project_info": {
-    "project_number": "151159935112",
-    "project_id": "balimo",
-    "storage_bucket": "balimo.firebasestorage.app"
+    "project_number": "116110393407",
+    "project_id": "balimo-82b41",
+    "storage_bucket": "balimo-82b41.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:151159935112:android:958c3f68a588a7dbd24f3d",
+        "mobilesdk_app_id": "1:116110393407:android:9a0e3d1d9a2bee5c58788a",
+        "android_client_info": {
+          "package_name": "com.bal.admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO5WueCmHC2hSZPb4T5eMKobYnt8OZlmA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:116110393407:android:211b259eb9e6cc0958788a",
+        "android_client_info": {
+          "package_name": "com.bal.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO5WueCmHC2hSZPb4T5eMKobYnt8OZlmA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:116110393407:android:9c1fdf0ca615ac0d58788a",
         "android_client_info": {
           "package_name": "com.bal.driver"
         }
@@ -15,7 +53,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAxp2nKZYo9kE3scrNzwLacbPqNzL95YG8"
+          "current_key": "AIzaSyCO5WueCmHC2hSZPb4T5eMKobYnt8OZlmA"
         }
       ],
       "services": {

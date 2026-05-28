@@ -46,7 +46,7 @@
       [
         "react-native-maps",
         {
-          "androidGoogleMapsApiKey": "AIzaSyDRN3_J4mGdkmWifoACmHBfT68sIvD3kQ8"
+          "androidGoogleMapsApiKey": "AIzaSyAz4YMeMa3klDCnm_HZh6IuwkqA_5t0I0w"
         }
       ],
       [
@@ -59,7 +59,7 @@
     "extra": {
       "apiBaseUrl": "https://bestaerolimo.com/api",
       "useMocks": false,
-      "googlePlacesApiKey": "AIzaSyDRN3_J4mGdkmWifoACmHBfT68sIvD3kQ8",
+      "googlePlacesApiKey": "AIzaSyAz4YMeMa3klDCnm_HZh6IuwkqA_5t0I0w",
       "sosContacts": {
         "police": "100",
         "medical": "108",
