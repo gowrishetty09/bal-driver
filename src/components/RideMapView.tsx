@@ -140,7 +140,6 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   const { colors } = useTheme();
   const mapRef = useRef<MapView>(null);
   const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
-  const [routeIsDirections, setRouteIsDirections] = useState(false);
   const [liveEtaTime, setLiveEtaTime] = useState<string | null>(null);
   const [liveEtaDistance, setLiveEtaDistance] = useState<string | null>(null);
   const lastRouteFetchRef = useRef<{ ts: number; origin: string; destination: string } | null>(null);
@@ -159,88 +158,103 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   const isAfterPickup = status === "PICKED_UP";
   const destinationLatLng = isAfterPickup ? dropLatLng : pickupLatLng;
 
-  // Fetch directions from Google Directions API
+  // Fetch directions from Google Directions API — always retries, never falls back to straight line
   useEffect(() => {
-    const fetchRoute = async () => {
-      const origin = driverLatLng;
-      const destination = destinationLatLng;
+    let cancelled = false;
+    const controller = new AbortController();
 
-      // Fallback: if no driver, show route from pickup to drop
-      const fallbackOrigin = pickupLatLng;
-      const fallbackDestination = dropLatLng;
+    // Compute primitives for use inside closure (deps are primitives to avoid stale-closure issues)
+    const driverLat = driverLatLng?.lat ?? null;
+    const driverLng = driverLatLng?.lng ?? null;
+    const destLat   = destinationLatLng?.lat ?? null;
+    const destLng   = destinationLatLng?.lng ?? null;
+    const pkLat     = pickupLatLng?.lat ?? null;
+    const pkLng     = pickupLatLng?.lng ?? null;
+    const drLat     = dropLatLng?.lat ?? null;
+    const drLng     = dropLatLng?.lng ?? null;
 
-      const routeOrigin = origin && destination ? origin : fallbackOrigin;
-      const routeDestination = origin && destination ? destination : fallbackDestination;
+    // Decide origin / destination
+    const hasDriver = driverLat !== null && driverLng !== null && destLat !== null && destLng !== null;
+    const originLat  = hasDriver ? driverLat!  : pkLat;
+    const originLng  = hasDriver ? driverLng!  : pkLng;
+    const destFinalLat = hasDriver ? destLat!  : drLat;
+    const destFinalLng = hasDriver ? destLng!  : drLng;
 
-      if (!routeOrigin || !routeDestination) {
-        setRoutePoints([]);
-        setRouteIsDirections(false);
-        return;
-      }
+    if (originLat === null || originLng === null || destFinalLat === null || destFinalLng === null) {
+      setRoutePoints([]);
+      return () => { cancelled = true; controller.abort(); };
+    }
 
-      // Throttle: only fetch every 15 seconds
-      const now = Date.now();
-      const originKey = `${routeOrigin.lat},${routeOrigin.lng}`;
-      const destKey = `${routeDestination.lat},${routeDestination.lng}`;
-      const last = lastRouteFetchRef.current;
+    if (!GOOGLE_DIRECTIONS_API_KEY) {
+      console.warn("[RideMapView] GOOGLE_DIRECTIONS_API_KEY is not set — route cannot be drawn.");
+      setRoutePoints([]);
+      return () => { cancelled = true; controller.abort(); };
+    }
 
-      if (last && now - last.ts < 15000) {
-        if (last.origin === originKey && last.destination === destKey) {
-          return;
-        }
-      }
+    const originKey = `${originLat},${originLng}`;
+    const destKey   = `${destFinalLat},${destFinalLng}`;
 
-      // If no API key, use straight line
-      if (!GOOGLE_DIRECTIONS_API_KEY) {
-        setRoutePoints([
-          { latitude: routeOrigin.lat, longitude: routeOrigin.lng },
-          { latitude: routeDestination.lat, longitude: routeDestination.lng },
-        ]);
-        setRouteIsDirections(false);
-        return;
-      }
+    // Throttle: skip if the same route was successfully fetched in the last 15 s
+    const last = lastRouteFetchRef.current;
+    if (last && Date.now() - last.ts < 15000 && last.origin === originKey && last.destination === destKey) {
+      return () => { cancelled = true; controller.abort(); };
+    }
+
+    const tryFetch = async (attempt: number): Promise<void> => {
+      if (cancelled) return;
 
       try {
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originKey}&destination=${destKey}&mode=driving&key=${GOOGLE_DIRECTIONS_API_KEY}`;
-        
-        const response = await fetch(url);
+        const url =
+          `https://maps.googleapis.com/maps/api/directions/json` +
+          `?origin=${originKey}&destination=${destKey}&mode=driving&key=${GOOGLE_DIRECTIONS_API_KEY}`;
+
+        const response = await fetch(url, { signal: controller.signal });
+        if (cancelled) return;
+
         const json = await response.json();
+        if (cancelled) return;
 
         if (json.status === "OK" && json.routes?.[0]?.overview_polyline?.points) {
           const decoded = decodePolyline(json.routes[0].overview_polyline.points);
           setRoutePoints(decoded);
-          setRouteIsDirections(true);
-          lastRouteFetchRef.current = { ts: now, origin: originKey, destination: destKey };
-          
-          // Extract live ETA from directions response
+          lastRouteFetchRef.current = { ts: Date.now(), origin: originKey, destination: destKey };
+
           const leg = json.routes[0].legs?.[0];
-          if (leg?.duration?.text) {
-            setLiveEtaTime(leg.duration.text);
-          }
-          if (leg?.distance?.text) {
-            setLiveEtaDistance(leg.distance.text);
-          }
+          if (leg?.duration?.text) setLiveEtaTime(leg.duration.text);
+          if (leg?.distance?.text) setLiveEtaDistance(leg.distance.text);
           return;
         }
 
-        // Fallback to straight line
-        setRoutePoints([
-          { latitude: routeOrigin.lat, longitude: routeOrigin.lng },
-          { latitude: routeDestination.lat, longitude: routeDestination.lng },
-        ]);
-        setRouteIsDirections(false);
-      } catch (error) {
-        console.warn("[RideMapView] Directions error:", error);
-        setRoutePoints([
-          { latitude: routeOrigin.lat, longitude: routeOrigin.lng },
-          { latitude: routeDestination.lat, longitude: routeDestination.lng },
-        ]);
-        setRouteIsDirections(false);
+        // Non-OK status (e.g. ZERO_RESULTS, REQUEST_DENIED) — retry with backoff
+        console.warn(`[RideMapView] Directions API status: ${json.status} (attempt ${attempt + 1})`);
+      } catch (err: any) {
+        if (err?.name === "AbortError" || cancelled) return;
+        console.warn(`[RideMapView] Directions fetch error (attempt ${attempt + 1}):`, err?.message ?? err);
       }
+
+      // Retry up to 3 times with exponential backoff (1 s, 2 s, 4 s)
+      if (attempt < 3) {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        return tryFetch(attempt + 1);
+      }
+
+      // All retries exhausted — clear route rather than show a misleading straight line
+      if (!cancelled) setRoutePoints([]);
     };
 
-    fetchRoute();
-  }, [driverLatLng?.lat, driverLatLng?.lng, destinationLatLng?.lat, destinationLatLng?.lng, pickupLatLng, dropLatLng]);
+    void tryFetch(0);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [
+    driverLatLng?.lat, driverLatLng?.lng,
+    destinationLatLng?.lat, destinationLatLng?.lng,
+    pickupLatLng?.lat, pickupLatLng?.lng,
+    dropLatLng?.lat, dropLatLng?.lng,
+  ]);
 
   // Fit map to show all points (only once when route is ready)
   useEffect(() => {

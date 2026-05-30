@@ -5,6 +5,7 @@ import {
   Dimensions,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -51,8 +52,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const PICKUP_CODE_LENGTH = 6;
 
-// Pickup proximity threshold in meters (100m radius)
-const PICKUP_PROXIMITY_THRESHOLD_METERS = 200;
+// Pickup proximity threshold in meters — 2 km to handle GPS drift inside airport terminals
+const PICKUP_PROXIMITY_THRESHOLD_METERS = 2000;
 
 // Simple distance calculation using Haversine formula (no external dependency)
 const calculateDistance = (
@@ -73,6 +74,61 @@ const calculateDistance = (
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // Distance in meters
+};
+
+/**
+ * Shows a sheet asking the driver which navigation app to open.
+ * Waze is always offered regardless of default app settings because
+ * deep-linking to `waze://` bypasses the OS default entirely.
+ */
+const openNavigationChooser = (lat: number, lng: number, label: string) => {
+  const googleMapsUrl = Platform.OS === "ios"
+    ? `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`
+    : `google.navigation:q=${lat},${lng}`;
+  const googleMapsWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  const wazeUrl = `waze://?ll=${lat},${lng}&navigate=yes`;
+  const appleMapsUrl = `maps://?daddr=${lat},${lng}&dirflg=d`;
+
+  const tryOpen = async (url: string, fallbackUrl?: string) => {
+    const supported = await Linking.canOpenURL(url).catch(() => false);
+    if (supported) {
+      await Linking.openURL(url);
+    } else if (fallbackUrl) {
+      await Linking.openURL(fallbackUrl).catch(() => {
+        Alert.alert("Unable to open", "Could not launch the navigation app.");
+      });
+    } else {
+      Alert.alert("App not installed", `${url.split("://")[0]} is not installed on this device.`);
+    }
+  };
+
+  const buttons: { text: string; onPress: () => void }[] = [
+    {
+      text: "🗺  Google Maps",
+      onPress: () => void tryOpen(googleMapsUrl, googleMapsWebUrl),
+    },
+    {
+      text: "🔵 Waze",
+      onPress: () => void tryOpen(wazeUrl),
+    },
+  ];
+
+  if (Platform.OS === "ios") {
+    buttons.push({
+      text: "🍎 Apple Maps",
+      onPress: () => void tryOpen(appleMapsUrl),
+    });
+  }
+
+  Alert.alert(
+    `Navigate to ${label}`,
+    "Choose your navigation app",
+    [
+      ...buttons,
+      { text: "Cancel", style: "cancel" as const, onPress: () => {} },
+    ],
+    { cancelable: true },
+  );
 };
 
 const STATUS_LABELS: Record<JobStatus, string> = {
@@ -533,7 +589,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               : "";
           Alert.alert(
             "Not at Pickup Location",
-            `You need to be within ${PICKUP_PROXIMITY_THRESHOLD_METERS}m of the pickup location to mark as arrived.${distanceText}`,
+            `You need to be within 2 km of the pickup location to mark as arrived.${distanceText}`,
             [{ text: "OK" }],
           );
           return;
@@ -806,12 +862,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                         }
                       : null;
                 if (destination) {
-                  const url = `google.navigation:q=${destination.lat},${destination.lng}`;
-                  Linking.openURL(url).catch(() => {
-                    Linking.openURL(
-                      `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`,
-                    );
-                  });
+                  openNavigationChooser(destination.lat, destination.lng, destination.label);
                 }
               }}
             >
@@ -984,12 +1035,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               style={styles.navigateButton}
               onPress={() => {
                 const { lat, lng } = job.pickupCoords!;
-                const url = `google.navigation:q=${lat},${lng}`;
-                Linking.openURL(url).catch(() => {
-                  Linking.openURL(
-                    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-                  );
-                });
+                openNavigationChooser(lat, lng, "Pickup");
               }}
             >
               <Text style={styles.navigateButtonText}>
@@ -1002,12 +1048,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               style={styles.navigateButton}
               onPress={() => {
                 const { lat, lng } = job.dropCoords!;
-                const url = `google.navigation:q=${lat},${lng}`;
-                Linking.openURL(url).catch(() => {
-                  Linking.openURL(
-                    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-                  );
-                });
+                openNavigationChooser(lat, lng, "Drop-off");
               }}
             >
               <Text style={styles.navigateButtonText}>
@@ -1029,6 +1070,37 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                 ]}
                 onPress={() => {
                   if (nextStatus === "PICKED_UP") {
+                    // Hotel portal bookings have no pickup code — start ride directly.
+                    if (job?.source === "HOTEL_PORTAL") {
+                      setActionLoading(true);
+                      void (async () => {
+                        try {
+                          await verifyPickupCode(job.id, "");
+                          setAwaitingRideStartConfirmation(true);
+                          showInfoToast("Starting ride…", "Waiting for confirmation.");
+                          try {
+                            const updated = await getDriverJobDetails(job.id);
+                            setJob(updated);
+                            if (updated.status === "PICKED_UP") {
+                              setAwaitingRideStartConfirmation(false);
+                              emitJobRefresh();
+                              showSuccessToast("Ride started", "Pickup confirmed.");
+                              rootNavigation.navigate("RidesTab", {
+                                screen: "JobDetails",
+                                params: { jobId: job.id },
+                              });
+                            }
+                          } catch {
+                            // Ignore; timeout fallback will handle.
+                          }
+                        } catch (err: any) {
+                          showErrorToast("Start ride", err?.response?.data?.message ?? "Failed to start ride.");
+                        } finally {
+                          setActionLoading(false);
+                        }
+                      })();
+                      return;
+                    }
                     setPickupCodeModalVisible(true);
                     return;
                   }

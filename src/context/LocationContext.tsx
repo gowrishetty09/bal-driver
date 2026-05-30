@@ -77,6 +77,21 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     }
 
     try {
+      // On cold-start (no coords yet) publish a cached fix immediately so the map
+      // shows something while getCurrentPositionAsync is still waiting for GPS.
+      let seedCoords: { latitude: number; longitude: number } | null = null;
+      if (!lastKnownCoordinates) {
+        try {
+          const cached = await Location.getLastKnownPositionAsync({ maxAge: 30_000, requiredAccuracy: 500 });
+          if (cached) {
+            seedCoords = { latitude: cached.coords.latitude, longitude: cached.coords.longitude };
+            setLastKnownCoordinates(seedCoords);
+          }
+        } catch {
+          // silent — fresh fix below will populate it
+        }
+      }
+
       const position = await Location.getCurrentPositionAsync({
         accuracy: highFrequencyRef.current ? Location.Accuracy.High : Location.Accuracy.Balanced,
       });
@@ -106,7 +121,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     } catch (error) {
       console.log('Unable to send location update', error);
     }
-  }, [isAuthenticated, permissionStatus, user?.id]);
+  }, [isAuthenticated, permissionStatus, user?.id, lastKnownCoordinates]);
 
   const startInterval = useCallback((highFrequency = false) => {
     // Clear existing interval first
@@ -141,6 +156,18 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
       setPermissionStatus(status ?? 'undetermined');
+
+      // Immediately seed with cached position so UI doesn't hang on first render
+      if (status === 'granted') {
+        try {
+          const last = await Location.getLastKnownPositionAsync({ maxAge: 60_000, requiredAccuracy: 500 });
+          if (last) {
+            setLastKnownCoordinates({ latitude: last.coords.latitude, longitude: last.coords.longitude });
+          }
+        } catch {
+          // silent — fresh fix will arrive via interval shortly
+        }
+      }
     } catch (error) {
       console.log('Unable to read location permission', error);
       setPermissionStatus('undetermined');
@@ -152,6 +179,15 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       const { status } = await Location.requestForegroundPermissionsAsync();
       setPermissionStatus(status ?? 'undetermined');
       if (status === 'granted' && isAuthenticated) {
+        // Seed immediately with last known position before the interval fires
+        try {
+          const last = await Location.getLastKnownPositionAsync({ maxAge: 60_000, requiredAccuracy: 500 });
+          if (last) {
+            setLastKnownCoordinates({ latitude: last.coords.latitude, longitude: last.coords.longitude });
+          }
+        } catch {
+          // silent
+        }
         startInterval();
       }
     } catch (error) {
