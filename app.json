@@ -21,6 +21,15 @@
       "supportsTablet": true,
       "jsEngine": "jsc"
     },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "url": "https://u.expo.dev/8438fa17-4c08-44c3-ac11-2962a3c04b1b",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "android": {
       "package": "com.bal.driver",
       "versionCode": 21,
@@ -43,6 +52,7 @@
       "expo-notifications",
       "expo-secure-store",
       "expo-location",
+      "expo-updates",
       [
         "react-native-maps",
         {

@@ -52,8 +52,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const PICKUP_CODE_LENGTH = 6;
 
-// Pickup proximity threshold in meters — 2 km to handle GPS drift inside airport terminals
-const PICKUP_PROXIMITY_THRESHOLD_METERS = 2000;
+// Pickup proximity threshold in meters — 5 km to allow earlier arrival confirmation
+const PICKUP_PROXIMITY_THRESHOLD_METERS = 5000;
 
 // Simple distance calculation using Haversine formula (no external dependency)
 const calculateDistance = (
@@ -77,39 +77,59 @@ const calculateDistance = (
 };
 
 /**
- * Shows a sheet asking the driver which navigation app to open.
- * Waze is always offered regardless of default app settings because
- * deep-linking to `waze://` bypasses the OS default entirely.
+ * Shows navigation choices with app-specific deep links.
+ * The system-default option uses a generic maps URI, while Google Maps and
+ * Waze use their own navigation URLs so each app opens with directions.
  */
 const openNavigationChooser = (lat: number, lng: number, label: string) => {
+  const destination = `${lat},${lng}`;
+  const encodedLabel = encodeURIComponent(label);
   const googleMapsUrl = Platform.OS === "ios"
-    ? `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`
-    : `google.navigation:q=${lat},${lng}`;
-  const googleMapsWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-  const wazeUrl = `waze://?ll=${lat},${lng}&navigate=yes`;
-  const appleMapsUrl = `maps://?daddr=${lat},${lng}&dirflg=d`;
+    ? `comgooglemaps://?daddr=${destination}&directionsmode=driving`
+    : `google.navigation:q=${destination}&mode=d`;
+  const googleMapsWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+  const wazeUrl = `https://waze.com/ul?ll=${destination}&navigate=yes`;
+  const defaultMapsUrl = Platform.OS === "android"
+    ? `geo:0,0?q=${destination}(${encodedLabel})`
+    : `maps://?daddr=${destination}&dirflg=d`;
 
-  const tryOpen = async (url: string, fallbackUrl?: string) => {
-    const supported = await Linking.canOpenURL(url).catch(() => false);
-    if (supported) {
-      await Linking.openURL(url);
-    } else if (fallbackUrl) {
-      await Linking.openURL(fallbackUrl).catch(() => {
+  if (Platform.OS === "android") {
+    void Linking.openURL(defaultMapsUrl).catch(() => {
+      Linking.openURL(googleMapsWebUrl).catch(() => {
         Alert.alert("Unable to open", "Could not launch the navigation app.");
       });
-    } else {
-      Alert.alert("App not installed", `${url.split("://")[0]} is not installed on this device.`);
+    });
+    return;
+  }
+
+  const tryOpen = async (url: string, fallbackUrl?: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      if (fallbackUrl) {
+        try {
+          await Linking.openURL(fallbackUrl);
+          return;
+        } catch {
+          // fall through to the alert below
+        }
+      }
+      Alert.alert("Unable to open", "Could not launch the navigation app.");
     }
   };
 
   const buttons: { text: string; onPress: () => void }[] = [
+    {
+      text: "📍 System default maps",
+      onPress: () => void tryOpen(defaultMapsUrl, googleMapsWebUrl),
+    },
     {
       text: "🗺  Google Maps",
       onPress: () => void tryOpen(googleMapsUrl, googleMapsWebUrl),
     },
     {
       text: "🔵 Waze",
-      onPress: () => void tryOpen(wazeUrl),
+      onPress: () => void tryOpen(wazeUrl, googleMapsWebUrl),
     },
   ];
 
@@ -589,7 +609,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               : "";
           Alert.alert(
             "Not at Pickup Location",
-            `You need to be within 2 km of the pickup location to mark as arrived.${distanceText}`,
+            `You need to be within 5 km of the pickup location to mark as arrived.${distanceText}`,
             [{ text: "OK" }],
           );
           return;
@@ -1351,7 +1371,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             <View style={styles.modalCard}>
               <Text style={styles.sectionTitle}>Cancel Ride</Text>
               <Text style={styles.subtle}>
-                Provide a reason so dispatch can notify the rider.
+                Provide a reason so dispatch can notify the rider and the admin timeline shows that you cancelled it.
               </Text>
               <TextInput
                 style={styles.modalInput}
@@ -1707,7 +1727,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           <View style={styles.modalCard}>
             <Text style={styles.sectionTitle}>Cancel Ride</Text>
             <Text style={styles.subtle}>
-              Provide a reason so dispatch can notify the rider.
+              Provide a reason so dispatch can notify the rider and the admin timeline shows that you cancelled it.
             </Text>
             <TextInput
               style={styles.modalInput}

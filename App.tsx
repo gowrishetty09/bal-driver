@@ -12,6 +12,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useFeedbackSync } from './src/hooks/useFeedbackSync';
 import { NetworkStatusModal } from './src/components/NetworkStatusModal';
+import { ForceUpdateGate } from './src/components/ForceUpdateGate';
 
 const FeedbackSyncProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   useFeedbackSync();
@@ -23,18 +24,20 @@ export default function App() {
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <NotificationProvider>
-              <LocationProvider>
-                <SosProvider>
-                  <FeedbackSyncProvider>
-                    <AppNavigator />
-                    <NetworkStatusModal />
-                  </FeedbackSyncProvider>
-                </SosProvider>
-              </LocationProvider>
-            </NotificationProvider>
-          </AuthProvider>
+          <ForceUpdateGate>
+            <AuthProvider>
+              <NotificationProvider>
+                <LocationProvider>
+                  <SosProvider>
+                    <FeedbackSyncProvider>
+                      <AppNavigator />
+                      <NetworkStatusModal />
+                    </FeedbackSyncProvider>
+                  </SosProvider>
+                </LocationProvider>
+              </NotificationProvider>
+            </AuthProvider>
+          </ForceUpdateGate>
         </ThemeProvider>
         <Toast />
       </SafeAreaProvider>
