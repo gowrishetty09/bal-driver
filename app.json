@@ -21,9 +21,7 @@
       "supportsTablet": true,
       "jsEngine": "jsc"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.1.0",
     "updates": {
       "enabled": true,
       "url": "https://u.expo.dev/8438fa17-4c08-44c3-ac11-2962a3c04b1b",
