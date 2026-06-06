@@ -89,6 +89,7 @@ const openNavigationChooser = (lat: number, lng: number, label: string) => {
     : `google.navigation:q=${destination}&mode=d`;
   const googleMapsWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
   const wazeUrl = `https://waze.com/ul?ll=${destination}&navigate=yes`;
+  const appleMapsUrl = `maps://?daddr=${destination}&dirflg=d`;
   const defaultMapsUrl = Platform.OS === "android"
     ? `geo:0,0?q=${destination}(${encodedLabel})`
     : `maps://?daddr=${destination}&dirflg=d`;
@@ -601,16 +602,20 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
         }
 
         if (currentProximity.canVerify && !currentProximity.isNear) {
-          const distanceText =
+          const distanceKm =
             typeof currentProximity.distanceMeters === "number"
-              ? ` (currently ~${Math.round(
-                  currentProximity.distanceMeters,
-                )}m away)`
+              ? ` (you appear to be ~${(currentProximity.distanceMeters / 1000).toFixed(1)} km away)`
               : "";
           Alert.alert(
             "Not at Pickup Location",
-            `You need to be within 5 km of the pickup location to mark as arrived.${distanceText}`,
-            [{ text: "OK" }],
+            `You appear to be far from the pickup location${distanceKm}. Are you sure you want to mark as arrived?`,
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Mark arrived",
+                onPress: () => void performStatusUpdate(nextStatus, reason),
+              },
+            ],
           );
           return;
         }
@@ -1081,13 +1086,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           <View style={styles.overlayActionsContainer}>
             {nextStatus && (
               <Pressable
-                style={[
-                  styles.overlayPrimaryAction,
-                  nextStatus === "ARRIVED" &&
-                    pickupProximity.canVerify &&
-                    !pickupProximity.isNear &&
-                    styles.actionButtonDisabledStyle,
-                ]}
+                style={styles.overlayPrimaryAction}
                 onPress={() => {
                   if (nextStatus === "PICKED_UP") {
                     // Hotel portal bookings have no pickup code — start ride directly.
@@ -1130,25 +1129,12 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                     handleStatusUpdate(nextStatus);
                   }
                 }}
-                disabled={
-                  actionLoading ||
-                  (nextStatus === "ARRIVED" &&
-                    pickupProximity.canVerify &&
-                    !pickupProximity.isNear)
-                }
+                disabled={actionLoading}
               >
                 {actionLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text
-                    style={[
-                      styles.overlayPrimaryActionLabel,
-                      nextStatus === "ARRIVED" &&
-                        pickupProximity.canVerify &&
-                        !pickupProximity.isNear &&
-                        styles.overlayPrimaryActionLabelDisabled,
-                    ]}
-                  >
+                  <Text style={styles.overlayPrimaryActionLabel}>
                     {nextStatus === "ARRIVED" && "Mark as Arrived"}
                     {nextStatus === "PICKED_UP" && "Start Ride"}
                     {nextStatus === "COMPLETED" &&

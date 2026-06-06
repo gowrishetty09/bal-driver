@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import Constants from "expo-constants";
 import { NavigationContainer, useNavigation, DefaultTheme, Theme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -51,6 +52,14 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 
 const headerLogo = require("../../assets/horizantal-logo.png");
 
+const _appVersion: string =
+  String((Constants as any).expoConfig?.version ?? (Constants as any).manifest?.version ?? "").trim();
+
+const AppVersionBadge = () =>
+  _appVersion ? (
+    <Text style={styles.appVersion}>v{_appVersion}</Text>
+  ) : null;
+
 const HeaderLogo = () => (
   <Image
     source={headerLogo}
@@ -75,6 +84,7 @@ const HeaderActions: React.FC<{ onLogout: () => void; onNotifications?: () => vo
   iconColor,
 }) => (
   <View style={styles.headerActions}>
+    <AppVersionBadge />
     {onNotifications ? (
       <Pressable onPress={onNotifications} hitSlop={8} style={styles.headerIconButton}>
         <Ionicons name="notifications-outline" size={20} color={iconColor} />
@@ -134,7 +144,7 @@ const HomeStackNavigator = () => {
       <HomeStack.Screen
         name="Notifications"
         component={NotificationsScreen}
-        options={{ title: "Notifications" }}
+        options={{ title: "Notifications", headerRight: () => <AppVersionBadge /> }}
       />
     </HomeStack.Navigator>
   );
@@ -165,7 +175,7 @@ const RidesStackNavigator = () => {
       <RidesStack.Screen
         name="JobDetails"
         component={JobDetailsScreen}
-        options={{ title: "Job Details" }}
+        options={{ title: "Job Details", headerRight: () => <AppVersionBadge /> }}
       />
     </RidesStack.Navigator>
   );
@@ -439,5 +449,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  appVersion: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 10,
+    fontWeight: "500" as const,
+    letterSpacing: 0.3,
   },
 });
