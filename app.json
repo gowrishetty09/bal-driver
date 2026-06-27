@@ -30,7 +30,7 @@
     },
     "android": {
       "package": "com.bal.driver",
-      "versionCode": 21,
+      "versionCode": 22,
       "adaptiveIcon": {
         "foregroundImage": "./assets/AppIcons/playstore.png",
         "backgroundColor": "#151e2d"
@@ -40,6 +40,9 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.POST_NOTIFICATIONS"
       ]
     },
@@ -49,7 +52,15 @@
     "plugins": [
       "expo-notifications",
       "expo-secure-store",
-      "expo-location",
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "BAL Driver uses your location during active rides so dispatch, hotels, and admins can track the assigned car even when navigation is open."
+        }
+      ],
       "expo-updates",
       [
         "react-native-maps",

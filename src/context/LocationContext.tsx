@@ -3,6 +3,10 @@ import { AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 
 import { socketService } from '../services/socketService';
+import {
+  startBackgroundLocationTracking,
+  stopBackgroundLocationTracking,
+} from '../services/backgroundLocation';
 import { sendLocation as sendLocationRest } from '../api/driver';
 import { useAuth } from '../hooks/useAuth';
 
@@ -61,6 +65,16 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   const setActiveBookingId = useCallback((bookingId: string | null) => {
     activeBookingIdRef.current = bookingId;
     setActiveBookingIdState(bookingId);
+
+    if (bookingId && highFrequencyRef.current) {
+      startBackgroundLocationTracking().catch((error) => {
+        console.log('[Location] Unable to start background tracking:', error);
+      });
+    } else if (!bookingId) {
+      stopBackgroundLocationTracking().catch((error) => {
+        console.log('[Location] Unable to stop background tracking:', error);
+      });
+    }
   }, []);
 
   const stopInterval = useCallback(() => {
@@ -145,6 +159,16 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     console.log(`[Location] High frequency mode: ${enabled}`);
     highFrequencyRef.current = enabled;
     setHighFrequencyModeState(enabled);
+
+    if (enabled && activeBookingIdRef.current) {
+      startBackgroundLocationTracking().catch((error) => {
+        console.log('[Location] Unable to start background tracking:', error);
+      });
+    } else if (!enabled) {
+      stopBackgroundLocationTracking().catch((error) => {
+        console.log('[Location] Unable to stop background tracking:', error);
+      });
+    }
     
     // Restart interval with new frequency if we're currently sharing
     if (permissionStatus === 'granted' && isAuthenticated) {
@@ -202,6 +226,9 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   useEffect(() => {
     if (!isAuthenticated) {
       stopInterval();
+      stopBackgroundLocationTracking().catch((error) => {
+        console.log('[Location] Unable to stop background tracking:', error);
+      });
       return;
     }
 

@@ -6,7 +6,7 @@ import { loginDriver, DriverUser, logoutDriver, refreshDriverSession } from '../
 import { registerAuthHandlers, setSessionTokens } from '../api/client';
 import { SessionTokens, isTokenExpired } from '../types/auth';
 
-const SESSION_KEY = 'driverAuthSession';
+export const SESSION_KEY = 'driverAuthSession';
 const USER_KEY = 'driverAuthUser';
 
 type AuthState = {

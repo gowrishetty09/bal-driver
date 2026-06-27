@@ -1,5 +1,6 @@
 // Import shim first before any other imports
 import './shim';
+import './src/services/backgroundLocation';
 
 // Ensure WebSocket exists early during startup (Hermes / bridgeless safety)
 // Required for stability when any code touches WebSocket during initialization.

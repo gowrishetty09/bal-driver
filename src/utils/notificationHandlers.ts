@@ -31,6 +31,10 @@ export const triggerVibration = (notificationType: NotificationType): void => {
                 // Moderate vibration pattern for admin updates
                 Vibration.vibrate([100, 50, 100, 50, 100], false);
                 break;
+            case 'PICKUP_ALERT':
+                // Make missed pickup/airport arrival warnings hard to overlook.
+                Vibration.vibrate([0, 500, 200, 500, 200, 500, 200, 800], false);
+                break;
         }
     } catch (error) {
         console.warn('Failed to trigger vibration:', error);
@@ -49,7 +53,7 @@ export const getNotificationType = (data?: Record<string, string | number | bool
 
     // Check for mobile-style notificationType first
     const mobileType = data.notificationType;
-    if (mobileType === 'NEW_RIDE' || mobileType === 'RIDE_CANCELLED' || mobileType === 'SOS_MESSAGE' || mobileType === 'ADMIN_REASSIGNMENT') {
+    if (mobileType === 'NEW_RIDE' || mobileType === 'RIDE_CANCELLED' || mobileType === 'SOS_MESSAGE' || mobileType === 'ADMIN_REASSIGNMENT' || mobileType === 'PICKUP_ALERT') {
         return mobileType;
     }
 
@@ -69,9 +73,6 @@ export const getNotificationType = (data?: Record<string, string | number | bool
         case 'DRIVER_REASSIGNED':
         case 'ADMIN_UPDATE':
         case 'STATUS_ACTION_REQUIRED':
-            // STATUS_ACTION_REQUIRED is sent (among other things) when an
-            // admin/hotel changes the vehicle category for a booking, which
-            // unassigns the current driver. Route it like an admin update.
             return 'ADMIN_REASSIGNMENT';
         default:
             return 'NEW_RIDE';
@@ -96,6 +97,7 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
         case 'NEW_RIDE':
         case 'RIDE_CANCELLED':
         case 'ADMIN_REASSIGNMENT':
+        case 'PICKUP_ALERT':
             // Navigate to active jobs with specific job details
             return {
                 screen: 'RidesTab',

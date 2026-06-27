@@ -210,6 +210,16 @@ export const useNotificationService = () => {
             lightColor: '#FFB800',
         });
 
+        await Notifications.setNotificationChannelAsync('pickup-alerts', {
+            name: 'Urgent Pickup Alerts',
+            description: 'Loud alerts when the car has not arrived for an imminent pickup or flight arrival',
+            importance: Notifications.AndroidImportance.MAX,
+            sound: 'default',
+            vibrationPattern: [0, 500, 200, 500, 200, 500, 200, 800],
+            lightColor: '#FF0000',
+            enableVibrate: true,
+        });
+
         await Notifications.setNotificationChannelAsync('ride-cancellation', {
             name: 'Ride Cancellations',
             description: 'Notifications when rides are cancelled',
