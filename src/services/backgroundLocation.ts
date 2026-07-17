@@ -11,9 +11,10 @@ import { deriveSessionTokens, isTokenExpired, SessionTokens, TokenResponse } fro
 
 export const DRIVER_BACKGROUND_LOCATION_TASK = 'bal-driver-background-location';
 
-const BACKGROUND_LOCATION_INTERVAL_MS = 10_000;
-const BACKGROUND_LOCATION_DISTANCE_M = 25;
+const BACKGROUND_LOCATION_INTERVAL_MS = 5_000;
+const BACKGROUND_LOCATION_DISTANCE_M = 10;
 const BACKGROUND_LOCATION_DISCLOSURE_KEY = 'backgroundLocationDisclosureAccepted';
+const ACTIVE_BACKGROUND_BOOKING_ID_KEY = 'activeBackgroundLocationBookingId';
 
 const readStoredSession = async (): Promise<SessionTokens | null> => {
   const raw = await SecureStore.getItemAsync(SESSION_KEY);
@@ -58,11 +59,14 @@ const sendBackgroundLocation = async (location: Location.LocationObject) => {
   const token = await getUsableAccessToken();
   if (!token) return;
 
+  const bookingId = await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
+
   await axios.post(
     `${API_BASE_URL}/driver/location`,
     {
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
+      ...(bookingId ? { bookingId } : {}),
     },
     {
       headers: {
@@ -71,6 +75,15 @@ const sendBackgroundLocation = async (location: Location.LocationObject) => {
       timeout: 15000,
     },
   );
+};
+
+export const setBackgroundLocationBookingId = async (bookingId: string | null): Promise<void> => {
+  if (bookingId) {
+    await AsyncStorage.setItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY, bookingId);
+    return;
+  }
+
+  await AsyncStorage.removeItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
 };
 
 const confirmBackgroundLocationDisclosure = async (): Promise<boolean> => {

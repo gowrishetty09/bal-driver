@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 
 import { socketService } from '../services/socketService';
 import {
+  setBackgroundLocationBookingId,
   startBackgroundLocationTracking,
   stopBackgroundLocationTracking,
 } from '../services/backgroundLocation';
@@ -65,6 +66,10 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   const setActiveBookingId = useCallback((bookingId: string | null) => {
     activeBookingIdRef.current = bookingId;
     setActiveBookingIdState(bookingId);
+    socketService.setCurrentBookingId(bookingId);
+    setBackgroundLocationBookingId(bookingId).catch((error) => {
+      console.log('[Location] Unable to save background booking id:', error);
+    });
 
     if (bookingId && highFrequencyRef.current) {
       startBackgroundLocationTracking().catch((error) => {

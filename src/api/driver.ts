@@ -72,6 +72,9 @@ export type DriverJob = {
     notes?: string;
     flightNo?: string | null;
     flightEta?: string | null;
+    assignmentNotifiedAt?: string | null;
+    assignmentAcknowledgedAt?: string | null;
+    assignmentAckReminderCount?: number;
 };
 
 export type DriverJobDetail = DriverJob & {
@@ -249,6 +252,18 @@ export const updateDriverJobStatus = async (
     }
 };
 
+export const acknowledgeDriverJob = async (jobId: string): Promise<DriverJobDetail> => {
+    try {
+        const { data } = await apiClient.post<BackendJob>(`/driver/jobs/${jobId}/acknowledge`);
+        return mapBackendJobToDriverJobDetail(data);
+    } catch (error) {
+        if (shouldUseMocks()) {
+            return mockJobDetails(jobId);
+        }
+        throw error;
+    }
+};
+
 export type PickupCodeVerificationError = 'INVALID_CODE' | 'CODE_LOCKED';
 
 export type VerifyPickupCodeResult =
@@ -370,6 +385,9 @@ type BackendJob = {
     hotelContact?: string | null;
     vehicle?: { id: string; registrationNo?: string | null } | null;
     ref?: string | null;
+    assignmentNotifiedAt?: string | null;
+    assignmentAcknowledgedAt?: string | null;
+    assignmentAckReminderCount?: number;
 };
 
 const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob => ({
@@ -399,6 +417,9 @@ const mapBackendJobToDriverJob = (j: BackendJob, listType: JobType): DriverJob =
     notes: undefined,
     flightNo: j.flightNo ?? null,
     flightEta: j.flightEta ?? null,
+    assignmentNotifiedAt: j.assignmentNotifiedAt ?? null,
+    assignmentAcknowledgedAt: j.assignmentAcknowledgedAt ?? null,
+    assignmentAckReminderCount: j.assignmentAckReminderCount ?? 0,
 });
 
 const mapBackendJobToDriverJobDetail = (j: BackendJob): DriverJobDetail => ({

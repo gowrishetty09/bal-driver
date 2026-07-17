@@ -33,6 +33,7 @@ import {
   updateDriverJobStatus,
   verifyPickupCode,
   notifyDriverArrival,
+  acknowledgeDriverJob,
 } from "../../api/driver";
 import { getErrorMessage } from "../../utils/errors";
 import {
@@ -194,6 +195,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [pickupCode, setPickupCode] = useState("");
   const [awaitingRideStartConfirmation, setAwaitingRideStartConfirmation] =
     useState(false);
+  const [ackLoading, setAckLoading] = useState(false);
   const pickupCodeInputRef = useRef<TextInput>(null);
 
   const canSubmitPickupCode = useMemo(() => {
@@ -669,6 +671,38 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
   const nextStatus = job ? (STATUS_TRANSITIONS[job.status] ?? null) : null;
   const isJobTerminal = job ? TERMINAL_STATUSES.includes(job.status) : false;
+  const needsAssignmentAck =
+    !!job &&
+    job.status === "ASSIGNED" &&
+    !job.assignmentAcknowledgedAt;
+
+  const handleAcknowledgeAssignment = useCallback(async () => {
+    if (!job || ackLoading) return;
+    setAckLoading(true);
+    try {
+      const updatedJob = await acknowledgeDriverJob(job.id);
+      setJob((prevJob) => ({
+        ...prevJob!,
+        ...updatedJob,
+        pickupCoords: updatedJob.pickupCoords ?? prevJob?.pickupCoords,
+        dropCoords: updatedJob.dropCoords ?? prevJob?.dropCoords,
+        pickup: updatedJob.pickup ?? prevJob?.pickup,
+        dropoff: updatedJob.dropoff ?? prevJob?.dropoff,
+      }));
+      emitJobRefresh();
+      showSuccessToast(
+        "Job acknowledged",
+        "Dispatch can see you received this booking.",
+      );
+    } catch (error) {
+      showErrorToast(
+        "Acknowledgement failed",
+        getErrorMessage(error, "Please try again."),
+      );
+    } finally {
+      setAckLoading(false);
+    }
+  }, [ackLoading, job]);
 
   const paymentMethodNormalized = useMemo(() => {
     const method = job?.paymentMethod ?? "";
@@ -1084,6 +1118,21 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
 
           {/* Action buttons */}
           <View style={styles.overlayActionsContainer}>
+            {needsAssignmentAck && (
+              <Pressable
+                style={styles.overlayPrimaryAction}
+                onPress={handleAcknowledgeAssignment}
+                disabled={ackLoading}
+              >
+                {ackLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.overlayPrimaryActionLabel}>
+                    Acknowledge Job
+                  </Text>
+                )}
+              </Pressable>
+            )}
             {nextStatus && (
               <Pressable
                 style={styles.overlayPrimaryAction}
@@ -1654,6 +1703,22 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
                   ride first.
                 </Text>
               </View>
+            )}
+
+            {needsAssignmentAck && (
+              <Pressable
+                style={styles.primaryAction}
+                onPress={handleAcknowledgeAssignment}
+                disabled={ackLoading}
+              >
+                {ackLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryActionLabel}>
+                    Acknowledge Job
+                  </Text>
+                )}
+              </Pressable>
             )}
 
             {nextStatus && (
