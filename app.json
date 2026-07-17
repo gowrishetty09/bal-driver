@@ -19,7 +19,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "jsEngine": "jsc"
+      "jsEngine": "jsc",
+      "bundleIdentifier": "com.bal.driver",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BAL Driver uses your location to show nearby and assigned rides while you use the app.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BAL Driver uses your location during active rides so dispatch, hotels, and admins can track the assigned car even when navigation is open."
+      }
     },
     "runtimeVersion": "1.1.0",
     "updates": {
@@ -36,6 +42,11 @@
         "backgroundColor": "#151e2d"
       },
       "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAz4YMeMa3klDCnm_HZh6IuwkqA_5t0I0w"
+        }
+      },
       "edgeToEdgeEnabled": false,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -62,12 +73,6 @@
         }
       ],
       "expo-updates",
-      [
-        "react-native-maps",
-        {
-          "androidGoogleMapsApiKey": "AIzaSyAz4YMeMa3klDCnm_HZh6IuwkqA_5t0I0w"
-        }
-      ],
       [
         "expo-dev-client",
         {
