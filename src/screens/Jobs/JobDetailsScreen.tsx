@@ -475,10 +475,10 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       setHighFrequencyMode(false);
     }
 
-    // Cleanup: disable high frequency when leaving this screen
-    return () => {
-      setHighFrequencyMode(false);
-    };
+    // No unmount cleanup here: navigating away from this screen (e.g. to
+    // Google Maps, or back to the jobs list) must NOT stop tracking for a
+    // ride that's still in progress. Tracking only turns off above, when the
+    // ride's status itself reaches a terminal state.
   }, [job?.status, setHighFrequencyMode]);
 
   // Attach the active booking/job id to location updates while on an active ride
@@ -490,9 +490,9 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     const isActiveRide = ACTIVE_RIDE_STATUSES.includes(job.status);
     setActiveBookingId(isActiveRide ? job.id : null);
 
-    return () => {
-      setActiveBookingId(null);
-    };
+    // No unmount cleanup here, for the same reason as the high-frequency
+    // effect above: leaving this screen must not clear the active booking
+    // (and thereby stop background tracking) while the ride is still active.
   }, [job?.id, job?.status, setActiveBookingId]);
 
   const performStatusUpdate = useCallback(

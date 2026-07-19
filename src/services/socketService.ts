@@ -52,7 +52,10 @@ class SocketService {
 
 	private shouldBeConnected(): boolean {
 		const onlineOk = this.netOnline !== false;
-		const activeOk = this.appState === 'active';
+		const hasActiveBooking = Boolean(this.currentBookingId) || this.rideSubscriptions.size > 0;
+		// Stay connected while backgrounded if there's an active ride to track;
+		// otherwise disconnect in the background to save battery.
+		const activeOk = this.appState === 'active' || hasActiveBooking;
 		return onlineOk && activeOk;
 	}
 
@@ -363,6 +366,7 @@ class SocketService {
 	 */
 	setCurrentBookingId(bookingId: string | null): void {
 		this.currentBookingId = bookingId;
+		this.applyConnectionGate();
 	}
 
 	private startBatchFlush(): void {
