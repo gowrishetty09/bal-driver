@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Text, View, type AppStateStatus } from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 
@@ -12,6 +12,8 @@ type ForceUpdateGateProps = {
 };
 
 const FALLBACK_ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bal.driver';
+const OTA_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+const FOREGROUND_RECHECK_THROTTLE_MS = 2 * 60 * 1000;
 
 const getCurrentAppVersion = (): string => {
   const config = ((Constants as unknown) as any).expoConfig ?? ((Constants as unknown) as any).manifest;
@@ -44,21 +46,35 @@ export const ForceUpdateGate: React.FC<ForceUpdateGateProps> = ({ children }) =>
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [isChecking, setIsChecking] = useState(true);
   const [updateConfig, setUpdateConfig] = useState<DriverAppUpdateConfig | null>(null);
+  const isRunningCheck = useRef(false);
+  const lastUpdateCheckAt = useRef(0);
+  const appState = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
     let isActive = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    void (async () => {
+    const checkForOtaUpdate = async (): Promise<boolean> => {
+      if (__DEV__ || !Updates.isEnabled) {
+        return false;
+      }
+
       try {
-        if (Updates.isEnabled) {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            await Updates.fetchUpdateAsync();
-            await Updates.reloadAsync();
-            return;
-          }
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+          return true;
         }
+      } catch (error) {
+        console.warn('[ForceUpdateGate] Failed to apply OTA update:', error);
+      }
 
+      return false;
+    };
+
+    const checkMinimumVersion = async () => {
+      try {
         const config = await getDriverAppUpdateConfig();
         const currentVersion = getCurrentAppVersion();
 
@@ -66,18 +82,63 @@ export const ForceUpdateGate: React.FC<ForceUpdateGateProps> = ({ children }) =>
           if (isActive) {
             setUpdateConfig(config);
           }
+        } else if (isActive) {
+          setUpdateConfig(null);
         }
       } catch (error) {
         console.warn('[ForceUpdateGate] Failed to load update configuration:', error);
+      }
+    };
+
+    const runUpdateCheck = async (showInitialLoader = false) => {
+      if (isRunningCheck.current) {
+        return;
+      }
+
+      isRunningCheck.current = true;
+      lastUpdateCheckAt.current = Date.now();
+
+      if (showInitialLoader && isActive) {
+        setIsChecking(true);
+      }
+
+      try {
+        const isReloadingForOta = await checkForOtaUpdate();
+        if (!isReloadingForOta) {
+          await checkMinimumVersion();
+        }
       } finally {
+        isRunningCheck.current = false;
         if (isActive) {
           setIsChecking(false);
         }
       }
-    })();
+    };
+
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        const elapsedSinceLastCheck = Date.now() - lastUpdateCheckAt.current;
+        if (elapsedSinceLastCheck >= FOREGROUND_RECHECK_THROTTLE_MS) {
+          void runUpdateCheck();
+        }
+      }
+
+      appState.current = nextAppState;
+    });
+
+    void runUpdateCheck(true);
+    intervalId = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void runUpdateCheck();
+      }
+    }, OTA_CHECK_INTERVAL_MS);
 
     return () => {
       isActive = false;
+      appStateSubscription.remove();
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
   }, []);
 
