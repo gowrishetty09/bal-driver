@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
   Text,
-  Dimensions,
   Platform,
+  ScrollView,
 } from "react-native";
 import MapView, {
   Marker,
@@ -13,9 +13,8 @@ import MapView, {
 } from "react-native-maps";
 import { useTheme } from "../context/ThemeContext";
 import type { Coordinates, JobStatus } from "../api/driver";
-import { GOOGLE_DIRECTIONS_API_KEY } from "../utils/config";
+import type { DriverRoute } from "../services/routeDirections";
 
-const { width, height } = Dimensions.get("window");
 
 // Default center: Hyderabad, India
 const DEFAULT_CENTER = { lat: 17.385, lng: 78.4867 };
@@ -36,7 +35,7 @@ interface RideMapViewProps {
   dropAddress?: string;
   onNavigatePress?: () => void;
   fullScreen?: boolean;
-  showDirections?: boolean;
+  routeDetails?: DriverRoute | null;
   estimatedTime?: string;
   estimatedDistance?: string;
 }
@@ -87,45 +86,6 @@ const extractDriverLatLng = (loc: { latitude: number; longitude: number } | null
   return null;
 };
 
-// Decode Google encoded polyline
-const decodePolyline = (encoded: string): Array<{ latitude: number; longitude: number }> => {
-  const points: Array<{ latitude: number; longitude: number }> = [];
-  let index = 0;
-  let lat = 0;
-  let lng = 0;
-
-  while (index < encoded.length) {
-    let b: number;
-    let shift = 0;
-    let result = 0;
-
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-
-    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
-    lat += dlat;
-
-    shift = 0;
-    result = 0;
-
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-
-    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
-    lng += dlng;
-
-    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
-  }
-
-  return points;
-};
-
 export const RideMapView: React.FC<RideMapViewProps> = ({
   driverLocation,
   pickupCoords,
@@ -134,20 +94,16 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   pickupAddress,
   dropAddress,
   fullScreen = false,
+  routeDetails,
   estimatedTime: propEstimatedTime,
   estimatedDistance: propEstimatedDistance,
 }) => {
   const { colors } = useTheme();
   const mapRef = useRef<MapView>(null);
-  const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
-  const [liveEtaTime, setLiveEtaTime] = useState<string | null>(null);
-  const [liveEtaDistance, setLiveEtaDistance] = useState<string | null>(null);
-  const lastRouteFetchRef = useRef<{ ts: number; origin: string; destination: string } | null>(null);
+  const routePoints = routeDetails?.points ?? [];
   const hasFittedMapRef = useRef(false);
-
-  // Use live ETA if available, otherwise fall back to props
-  const estimatedTime = liveEtaTime ?? propEstimatedTime;
-  const estimatedDistance = liveEtaDistance ?? propEstimatedDistance;
+  const estimatedTime = routeDetails ? Math.ceil(routeDetails.durationSeconds / 60) + " min" : propEstimatedTime;
+  const estimatedDistance = routeDetails ? (routeDetails.distanceMeters / 1000).toFixed(1) + " km" : propEstimatedDistance;
 
   // Extract and validate coordinates
   const driverLatLng = extractDriverLatLng(driverLocation);
@@ -158,103 +114,8 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
   const isAfterPickup = status === "PICKED_UP";
   const destinationLatLng = isAfterPickup ? dropLatLng : pickupLatLng;
 
-  // Fetch directions from Google Directions API — always retries, never falls back to straight line
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-
-    // Compute primitives for use inside closure (deps are primitives to avoid stale-closure issues)
-    const driverLat = driverLatLng?.lat ?? null;
-    const driverLng = driverLatLng?.lng ?? null;
-    const destLat   = destinationLatLng?.lat ?? null;
-    const destLng   = destinationLatLng?.lng ?? null;
-    const pkLat     = pickupLatLng?.lat ?? null;
-    const pkLng     = pickupLatLng?.lng ?? null;
-    const drLat     = dropLatLng?.lat ?? null;
-    const drLng     = dropLatLng?.lng ?? null;
-
-    // Decide origin / destination
-    const hasDriver = driverLat !== null && driverLng !== null && destLat !== null && destLng !== null;
-    const originLat  = hasDriver ? driverLat!  : pkLat;
-    const originLng  = hasDriver ? driverLng!  : pkLng;
-    const destFinalLat = hasDriver ? destLat!  : drLat;
-    const destFinalLng = hasDriver ? destLng!  : drLng;
-
-    if (originLat === null || originLng === null || destFinalLat === null || destFinalLng === null) {
-      setRoutePoints([]);
-      return () => { cancelled = true; controller.abort(); };
-    }
-
-    if (!GOOGLE_DIRECTIONS_API_KEY) {
-      console.warn("[RideMapView] GOOGLE_DIRECTIONS_API_KEY is not set — route cannot be drawn.");
-      setRoutePoints([]);
-      return () => { cancelled = true; controller.abort(); };
-    }
-
-    const originKey = `${originLat},${originLng}`;
-    const destKey   = `${destFinalLat},${destFinalLng}`;
-
-    // Throttle: skip if the same route was successfully fetched in the last 15 s
-    const last = lastRouteFetchRef.current;
-    if (last && Date.now() - last.ts < 15000 && last.origin === originKey && last.destination === destKey) {
-      return () => { cancelled = true; controller.abort(); };
-    }
-
-    const tryFetch = async (attempt: number): Promise<void> => {
-      if (cancelled) return;
-
-      try {
-        const url =
-          `https://maps.googleapis.com/maps/api/directions/json` +
-          `?origin=${originKey}&destination=${destKey}&mode=driving&key=${GOOGLE_DIRECTIONS_API_KEY}`;
-
-        const response = await fetch(url, { signal: controller.signal });
-        if (cancelled) return;
-
-        const json = await response.json();
-        if (cancelled) return;
-
-        if (json.status === "OK" && json.routes?.[0]?.overview_polyline?.points) {
-          const decoded = decodePolyline(json.routes[0].overview_polyline.points);
-          setRoutePoints(decoded);
-          lastRouteFetchRef.current = { ts: Date.now(), origin: originKey, destination: destKey };
-
-          const leg = json.routes[0].legs?.[0];
-          if (leg?.duration?.text) setLiveEtaTime(leg.duration.text);
-          if (leg?.distance?.text) setLiveEtaDistance(leg.distance.text);
-          return;
-        }
-
-        // Non-OK status (e.g. ZERO_RESULTS, REQUEST_DENIED) — retry with backoff
-        console.warn(`[RideMapView] Directions API status: ${json.status} (attempt ${attempt + 1})`);
-      } catch (err: any) {
-        if (err?.name === "AbortError" || cancelled) return;
-        console.warn(`[RideMapView] Directions fetch error (attempt ${attempt + 1}):`, err?.message ?? err);
-      }
-
-      // Retry up to 3 times with exponential backoff (1 s, 2 s, 4 s)
-      if (attempt < 3) {
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise<void>((resolve) => setTimeout(resolve, delay));
-        return tryFetch(attempt + 1);
-      }
-
-      // All retries exhausted — clear route rather than show a misleading straight line
-      if (!cancelled) setRoutePoints([]);
-    };
-
-    void tryFetch(0);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [
-    driverLatLng?.lat, driverLatLng?.lng,
-    destinationLatLng?.lat, destinationLatLng?.lng,
-    pickupLatLng?.lat, pickupLatLng?.lng,
-    dropLatLng?.lat, dropLatLng?.lng,
-  ]);
+  // This component only displays GPS fixes and a route supplied by an explicit request.
+  useEffect(() => { hasFittedMapRef.current = false; }, [routeDetails]);
 
   // Fit map to show all points (only once when route is ready)
   useEffect(() => {
@@ -287,7 +148,7 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
     }, 500);
 
     return () => clearTimeout(timeout);
-  }, [routePoints.length, pickupLatLng?.lat, pickupLatLng?.lng, dropLatLng?.lat, dropLatLng?.lng]);
+  }, [routeDetails, routePoints.length, pickupLatLng?.lat, pickupLatLng?.lng, dropLatLng?.lat, dropLatLng?.lng]);
 
   // Calculate initial region
   const initialCenter = driverLatLng || pickupLatLng || dropLatLng || DEFAULT_CENTER;
@@ -379,6 +240,16 @@ export const RideMapView: React.FC<RideMapViewProps> = ({
         )}
       </MapView>
 
+      {fullScreen && Boolean(routeDetails?.steps.length) && (
+        <View style={{position:"absolute",bottom:100,left:12,right:12,maxHeight:180,backgroundColor:colors.card,borderRadius:12,padding:12}}>
+          <Text style={{color:colors.text,fontWeight:"700",marginBottom:6}}>Directions</Text>
+          <ScrollView>
+            {routeDetails!.steps.map((step,index)=><Text key={index} style={{color:colors.text,paddingVertical:6}}>
+              {index+1}. {step.instruction} ({step.distanceMeters >= 1000 ? (step.distanceMeters/1000).toFixed(1)+" km" : step.distanceMeters+" m"})
+            </Text>)}
+          </ScrollView>
+        </View>
+      )}
       {/* ETA Overlay */}
       {(estimatedTime || estimatedDistance) && (
         <View style={[styles.etaContainer, { backgroundColor: colors.card }]}>

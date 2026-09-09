@@ -48,12 +48,12 @@ export const triggerVibration = (notificationType: NotificationType): void => {
  */
 export const getNotificationType = (data?: Record<string, string | number | boolean>): NotificationType => {
     if (!data) {
-        return 'NEW_RIDE';
+        return 'GENERAL';
     }
 
     // Check for mobile-style notificationType first
     const mobileType = data.notificationType;
-    if (mobileType === 'NEW_RIDE' || mobileType === 'RIDE_CANCELLED' || mobileType === 'SOS_MESSAGE' || mobileType === 'ADMIN_REASSIGNMENT' || mobileType === 'PICKUP_ALERT') {
+    if (mobileType === 'NEW_RIDE' || mobileType === 'RIDE_CANCELLED' || mobileType === 'SOS_MESSAGE' || mobileType === 'ADMIN_REASSIGNMENT' || mobileType === 'PICKUP_ALERT' || mobileType === 'RIDE_UPDATE' || mobileType === 'GENERAL') {
         return mobileType;
     }
 
@@ -70,12 +70,20 @@ export const getNotificationType = (data?: Record<string, string | number | bool
         case 'SOS_ALERT':
         case 'SOS_MESSAGE':
             return 'SOS_MESSAGE';
+        case 'BOOKING_REMINDER_15_MIN':
+            return 'PICKUP_ALERT';
+        case 'DRIVER_EN_ROUTE':
+        case 'DRIVER_ARRIVED':
+        case 'RIDE_STARTED':
+        case 'RIDE_COMPLETED':
+        case 'BOOKING_NO_SHOW':
+            return 'RIDE_UPDATE';
         case 'DRIVER_REASSIGNED':
         case 'ADMIN_UPDATE':
         case 'STATUS_ACTION_REQUIRED':
             return 'ADMIN_REASSIGNMENT';
         default:
-            return 'NEW_RIDE';
+            return 'GENERAL';
     }
 };
 
@@ -98,6 +106,7 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
         case 'RIDE_CANCELLED':
         case 'ADMIN_REASSIGNMENT':
         case 'PICKUP_ALERT':
+        case 'RIDE_UPDATE':
             // Navigate to active jobs with specific job details
             return {
                 screen: 'RidesTab',
@@ -114,7 +123,7 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
                 screen: 'RidesTab',
             };
         default:
-            return { screen: 'RidesTab' };
+            return { screen: 'HomeTab', params: { screen: 'Notifications' } };
     }
 };
 
@@ -145,6 +154,8 @@ export const getChannelIdForType = (notificationType: NotificationType): string 
             return 'sos-alerts';
         case 'ADMIN_REASSIGNMENT':
             return 'admin-updates';
+        case 'PICKUP_ALERT':
+            return 'pickup-alerts';
         default:
             return 'default';
     }

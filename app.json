@@ -79,16 +79,18 @@
         {
           "launchMode": "most-recent"
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-asset"
     ],
     "extra": {
       "apiBaseUrl": "https://bestaerolimo.com/api",
       "useMocks": false,
       "googlePlacesApiKey": "AIzaSyAz4YMeMa3klDCnm_HZh6IuwkqA_5t0I0w",
       "sosContacts": {
-        "police": "100",
-        "medical": "108",
-        "support": "+1800123456",
+        "police": "999",
+        "medical": "999",
+        "support": "+60192667788",
         "shareTemplate": "Emergency! Please track me at https://maps.google.com/?q={lat},{lng}"
       },
       "eas": {

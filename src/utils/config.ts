@@ -56,9 +56,9 @@ type SosContacts = {
 };
 
 export const SOS_CONTACTS: SosContacts = {
-    police: fromEnv('EMERGENCY_POLICE_NUMBER', extra.sosContacts?.police ?? '112')!,
-    medical: fromEnv('EMERGENCY_MEDICAL_NUMBER', extra.sosContacts?.medical ?? '108')!,
-    support: fromEnv('SUPPORT_NUMBER', extra.sosContacts?.support ?? '+1800123456')!,
+    police: fromEnv('EMERGENCY_POLICE_NUMBER', extra.sosContacts?.police ?? '999')!,
+    medical: fromEnv('EMERGENCY_MEDICAL_NUMBER', extra.sosContacts?.medical ?? '999')!,
+    support: fromEnv('SUPPORT_NUMBER', extra.sosContacts?.support ?? '+60192667788')!,
     shareTemplate:
         extra.sosContacts?.shareTemplate ??
         fromEnv('SOS_SHARE_TEMPLATE', 'Emergency! Please track me at https://maps.google.com/?q={lat},{lng}') ??

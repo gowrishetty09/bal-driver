@@ -2,11 +2,12 @@ import React, { createContext, useCallback, useEffect, useMemo, useState } from 
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
-import { loginDriver, DriverUser, logoutDriver, refreshDriverSession } from '../api/driver';
+import { loginDriver, DriverUser, logoutDriver } from '../api/driver';
 import { registerAuthHandlers, setSessionTokens } from '../api/client';
 import { SessionTokens, isTokenExpired } from '../types/auth';
 
-export const SESSION_KEY = 'driverAuthSession';
+import { SESSION_KEY, getLocationSession, readLocationSession, subscribeSessionRefresh } from '../services/locationSession';
+export { SESSION_KEY } from '../services/locationSession';
 const USER_KEY = 'driverAuthUser';
 
 type AuthState = {
@@ -49,6 +50,10 @@ const clearStoredSession = () =>
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [state, setState] = useState<AuthState>({ tokens: null, user: null });
   const [isInitializing, setIsInitializing] = useState(true);
+  useEffect(() => subscribeSessionRefresh(tokens => {
+    setSessionTokens(tokens);
+    setState(prev => prev.user ? { ...prev, tokens } : prev);
+  }), []);
 
   const performLogout = useCallback(
     async ({ skipRemote }: { skipRemote?: boolean } = {}) => {
@@ -69,7 +74,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   );
 
   const refreshSession = useCallback(async (): Promise<SessionTokens | null> => {
-    const currentTokens = state.tokens;
+    const currentTokens = await readLocationSession();
     if (!currentTokens) {
       return null;
     }
@@ -80,13 +85,16 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
 
     try {
-      const nextTokens = await refreshDriverSession(currentTokens.refreshToken);
+      const nextTokens = await getLocationSession(currentTokens.accessToken);
+      if (!nextTokens) { await performLogout({ skipRemote: true }); return null; }
       setSessionTokens(nextTokens);
       setState((prev) => ({ ...prev, tokens: nextTokens }));
       await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextTokens));
       return nextTokens;
     } catch (error) {
-      await performLogout({ skipRemote: true });
+      if (axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+        await performLogout({ skipRemote: true });
+      }
       throw error;
     }
   }, [state.tokens, performLogout]);
@@ -123,12 +131,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
         if (isTokenExpired(storedTokens.accessTokenExpiresAt)) {
           try {
-            activeTokens = await refreshDriverSession(storedTokens.refreshToken);
+            const refreshed = await getLocationSession();
+            if (!refreshed) { await clearStoredSession(); return; }
+            activeTokens = refreshed;
             await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(activeTokens));
           } catch (error) {
             console.warn('Unable to refresh expired access token during bootstrap', error);
-            await clearStoredSession();
-            return;
+            if (axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
+              await clearStoredSession();
+              return;
+            }
+            // Preserve the session through a temporary network outage.
           }
         }
 

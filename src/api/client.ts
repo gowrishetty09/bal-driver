@@ -89,7 +89,9 @@ apiClient.interceptors.response.use(
 
             return apiClient(originalRequest);
         } catch (refreshError) {
-            await notifyUnauthorized();
+            if (axios.isAxiosError(refreshError) && [401, 403].includes(refreshError.response?.status ?? 0)) {
+                await notifyUnauthorized();
+            }
             return Promise.reject(refreshError);
         }
     }

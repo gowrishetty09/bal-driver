@@ -11,11 +11,13 @@ import { useNavigation } from "@react-navigation/native";
 
 import { Screen } from "../../components/Screen";
 import { LocationStatusBanner } from "../../components/LocationStatusBanner";
+import { AssignmentAlertCard } from "../../components/AssignmentAlertCard";
 import { useTheme, ThemeColors } from "../../context/ThemeContext";
 import { typography } from "../../theme/typography";
 import { useAuth } from "../../hooks/useAuth";
 import { useRealtimeJobs } from "../../hooks/useRealtimeJobs";
 import type { DriverJob } from "../../api/driver";
+import { formatBookingRef } from "../../utils/format";
 
 type JobType = "ACTIVE" | "UPCOMING" | "HISTORY";
 
@@ -119,6 +121,26 @@ export const HomeDashboardScreen: React.FC = () => {
     return uniqueJobs.sort((a, b) => getJobTime(b) - getJobTime(a)).slice(0, 3);
   }, [active.bookings, upcoming.bookings, history.bookings]);
 
+  const nextUpcomingJobs = useMemo(
+    () =>
+      [...upcoming.bookings]
+        .sort((a, b) => getJobTime(a) - getJobTime(b))
+        .slice(0, 3),
+    [upcoming.bookings],
+  );
+
+  const pendingAssignment = useMemo(
+    () =>
+      active.bookings.find(
+        (job) => job.status === "ASSIGNED" && !job.assignmentAcknowledgedAt,
+      ) ??
+      upcoming.bookings.find(
+        (job) => job.status === "ASSIGNED" && !job.assignmentAcknowledgedAt,
+      ) ??
+      null,
+    [active.bookings, upcoming.bookings],
+  );
+
   const weeklyCounts = useMemo(() => {
     const days = buildWeekDays();
     const byDay = new Map<string, number>();
@@ -139,6 +161,7 @@ export const HomeDashboardScreen: React.FC = () => {
     });
 
     const data = days.map((d) => ({
+      key: dayKey(d),
       label: d.toLocaleDateString(undefined, { weekday: "short" }),
       value: byDay.get(dayKey(d)) ?? 0,
     }));
@@ -163,6 +186,21 @@ export const HomeDashboardScreen: React.FC = () => {
       onRefresh={handleRefresh}
     >
       <LocationStatusBanner />
+
+      {pendingAssignment ? (
+        <AssignmentAlertCard
+          job={pendingAssignment}
+          onAcknowledge={() => {
+            void handleRefresh();
+          }}
+          onOpenDetails={(job) =>
+            navigation.navigate("RidesTab", {
+              screen: "JobDetails",
+              params: { jobId: job.id },
+            })
+          }
+        />
+      ) : null}
 
       <View style={styles.headerRow}>
         <View>
@@ -223,6 +261,51 @@ export const HomeDashboardScreen: React.FC = () => {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Upcoming rides</Text>
+          <Pressable onPress={() => goToRides("UPCOMING")}>
+            <Text style={styles.sectionAction}>View all</Text>
+          </Pressable>
+        </View>
+
+        {nextUpcomingJobs.length === 0 ? (
+          <View style={styles.compactEmpty}>
+            <Text style={styles.emptyText}>No upcoming rides.</Text>
+          </View>
+        ) : (
+          <View style={styles.compactList}>
+            {nextUpcomingJobs.map((job) => (
+              <Pressable
+                key={job.id}
+                style={({ pressed }) => [
+                  styles.compactRide,
+                  pressed && styles.recentItemPressed,
+                ]}
+                onPress={() =>
+                  navigation.navigate("RidesTab", {
+                    screen: "JobDetails",
+                    params: { jobId: job.id },
+                  })
+                }
+              >
+                <View style={styles.compactRideText}>
+                  <Text style={styles.recentRef} numberOfLines={1}>
+                    {formatBookingRef(job.reference || job.id)}
+                  </Text>
+                  <Text style={styles.recentRoute} numberOfLines={1}>
+                    {(job.pickup?.addressLine ?? "Pickup") +
+                      " -> " +
+                      (job.dropoff?.addressLine ?? "Drop")}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>This week's rides</Text>
           <Pressable onPress={() => goToRides("HISTORY")}>
             <Text style={styles.sectionAction}>View history</Text>
@@ -231,10 +314,9 @@ export const HomeDashboardScreen: React.FC = () => {
 
         <View style={styles.chartCard}>
           <View style={styles.chartRow}>
-            {weeklyCounts.data.map((d, index) => {
+            {weeklyCounts.data.map((d) => {
               const heightPct = (d.value / weeklyCounts.max) * 100;
-              const today = new Date();
-              const isToday = index === today.getDay();
+              const isToday = d.key === dayKey(new Date());
               return (
                 <View key={d.label} style={styles.chartCol}>
                   {d.value > 0 && (
@@ -297,7 +379,7 @@ export const HomeDashboardScreen: React.FC = () => {
               >
                 <View style={styles.recentLeft}>
                   <Text style={styles.recentRef} numberOfLines={1}>
-                    #{job.id.slice(-8)}
+                    {formatBookingRef(job.reference || job.id)}
                   </Text>
                   <Text style={styles.recentRoute} numberOfLines={1}>
                     {(job.pickup?.addressLine ?? "—") +
@@ -357,25 +439,30 @@ const StatCard: React.FC<{
 }> = ({ title, value, icon, accent, onPress, colors, styles }) => {
   const content = (
     <View style={[styles.statCard, { borderColor: accent }]}>
-      <View style={styles.statTop}>
+      <View style={styles.statInline}>
         <View style={[styles.statIconWrap, { backgroundColor: accent }]}>
           <Ionicons name={icon} size={18} color={colors.brandNavy} />
         </View>
-        <Text style={styles.statTitle} numberOfLines={1}>
-          {title}
-        </Text>
+        <View style={styles.statTextBlock}>
+          <Text style={styles.statTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={styles.statValue} numberOfLines={1}>
+            {value}
+          </Text>
+        </View>
       </View>
-      <Text style={styles.statValue} numberOfLines={1}>
-        {value}
-      </Text>
     </View>
   );
 
-  if (!onPress) return content;
+  if (!onPress) return <View style={styles.statCardShell}>{content}</View>;
 
   return (
     <Pressable
-      style={({ pressed }) => [pressed && { opacity: 0.92 }]}
+      style={({ pressed }) => [
+        styles.statCardShell,
+        pressed && { opacity: 0.92 },
+      ]}
       onPress={onPress}
     >
       {content}
@@ -387,9 +474,10 @@ const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: {
       paddingHorizontal: 16,
+      paddingTop: 0,
     },
     headerRow: {
-      marginTop: 8,
+      marginTop: 10,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -430,47 +518,51 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: typography.caption,
     },
     cardsGrid: {
-      marginTop: 14,
+      marginTop: 12,
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
-      rowGap: 12,
+      rowGap: 10,
     },
-    statCard: {
+    statCardShell: {
       width: "48.5%",
       minWidth: 150,
+    },
+    statCard: {
       backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 14,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
       borderWidth: 1,
     },
-    statTop: {
+    statInline: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      gap: 8,
+      gap: 10,
     },
     statIconWrap: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
       alignItems: "center",
       justifyContent: "center",
     },
-    statTitle: {
+    statTextBlock: {
       flex: 1,
+      minWidth: 0,
+    },
+    statTitle: {
       fontSize: typography.caption,
       color: colors.muted,
-      textAlign: "right",
     },
     statValue: {
-      marginTop: 10,
-      fontSize: typography.subheading,
+      marginTop: 2,
+      fontSize: 18,
       fontFamily: typography.fontFamilyBold,
       color: colors.text,
     },
     section: {
-      marginTop: 18,
+      marginTop: 16,
     },
     sectionHeader: {
       flexDirection: "row",
@@ -491,7 +583,7 @@ const createStyles = (colors: ThemeColors) =>
     chartCard: {
       backgroundColor: colors.card,
       borderRadius: 16,
-      padding: 14,
+      padding: 12,
       borderWidth: 1,
       borderColor: colors.border,
     },
@@ -506,7 +598,7 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: "center",
     },
     chartBarWrap: {
-      height: 90,
+      height: 72,
       width: "100%",
       backgroundColor: colors.cardSecondary,
       borderRadius: 10,
@@ -546,6 +638,31 @@ const createStyles = (colors: ThemeColors) =>
     emptyText: {
       color: colors.muted,
       fontSize: typography.body,
+    },
+    compactEmpty: {
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    compactList: {
+      gap: 8,
+    },
+    compactRide: {
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    compactRideText: {
+      flex: 1,
+      minWidth: 0,
     },
     primaryButton: {
       marginTop: 12,
@@ -602,7 +719,7 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.muted,
     },
     quickRow: {
-      marginTop: 18,
+      marginTop: 14,
       flexDirection: "row",
       gap: 12,
     },

@@ -63,3 +63,13 @@ web-build/
 .prettierrc
 .eslintrc*
 eslint.config.*
+
+# Generate native location permissions from app.json on EAS.
+/android
+/ios
+
+/.expo-export-check
+*.test.cjs
+
+# Local device screenshots
+/driver-*.png

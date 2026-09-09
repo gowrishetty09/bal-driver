@@ -1,6 +1,8 @@
+import { fetchDriverRoute, type DriverRoute } from "../../services/routeDirections";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Dimensions,
   Linking,
@@ -14,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Screen } from "../../components/Screen";
@@ -77,82 +79,6 @@ const calculateDistance = (
   return R * c; // Distance in meters
 };
 
-/**
- * Shows navigation choices with app-specific deep links.
- * The system-default option uses a generic maps URI, while Google Maps and
- * Waze use their own navigation URLs so each app opens with directions.
- */
-const openNavigationChooser = (lat: number, lng: number, label: string) => {
-  const destination = `${lat},${lng}`;
-  const encodedLabel = encodeURIComponent(label);
-  const googleMapsUrl = Platform.OS === "ios"
-    ? `comgooglemaps://?daddr=${destination}&directionsmode=driving`
-    : `google.navigation:q=${destination}&mode=d`;
-  const googleMapsWebUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
-  const wazeUrl = `https://waze.com/ul?ll=${destination}&navigate=yes`;
-  const appleMapsUrl = `maps://?daddr=${destination}&dirflg=d`;
-  const defaultMapsUrl = Platform.OS === "android"
-    ? `geo:0,0?q=${destination}(${encodedLabel})`
-    : `maps://?daddr=${destination}&dirflg=d`;
-
-  if (Platform.OS === "android") {
-    void Linking.openURL(defaultMapsUrl).catch(() => {
-      Linking.openURL(googleMapsWebUrl).catch(() => {
-        Alert.alert("Unable to open", "Could not launch the navigation app.");
-      });
-    });
-    return;
-  }
-
-  const tryOpen = async (url: string, fallbackUrl?: string) => {
-    try {
-      await Linking.openURL(url);
-    } catch {
-      if (fallbackUrl) {
-        try {
-          await Linking.openURL(fallbackUrl);
-          return;
-        } catch {
-          // fall through to the alert below
-        }
-      }
-      Alert.alert("Unable to open", "Could not launch the navigation app.");
-    }
-  };
-
-  const buttons: { text: string; onPress: () => void }[] = [
-    {
-      text: "📍 System default maps",
-      onPress: () => void tryOpen(defaultMapsUrl, googleMapsWebUrl),
-    },
-    {
-      text: "🗺  Google Maps",
-      onPress: () => void tryOpen(googleMapsUrl, googleMapsWebUrl),
-    },
-    {
-      text: "🔵 Waze",
-      onPress: () => void tryOpen(wazeUrl, googleMapsWebUrl),
-    },
-  ];
-
-  if (Platform.OS === "ios") {
-    buttons.push({
-      text: "🍎 Apple Maps",
-      onPress: () => void tryOpen(appleMapsUrl),
-    });
-  }
-
-  Alert.alert(
-    `Navigate to ${label}`,
-    "Choose your navigation app",
-    [
-      ...buttons,
-      { text: "Cancel", style: "cancel" as const, onPress: () => {} },
-    ],
-    { cancelable: true },
-  );
-};
-
 const STATUS_LABELS: Record<JobStatus, string> = {
   ASSIGNED: "Assigned",
   EN_ROUTE: "En route",
@@ -189,6 +115,19 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [noShowReason, setNoShowReason] = useState("");
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [routeDetails, setRouteDetails] = useState<DriverRoute | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const routeRequestRef = useRef<AbortController | null>(null);
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    routeRequestRef.current?.abort(); setRouteLoading(false); setRouteDetails(null);
+  }, [job?.id, job?.status === "PICKED_UP"]);
+  useEffect(() => {
+    const abort = () => { routeRequestRef.current?.abort(); routeRequestRef.current=null; setRouteLoading(false); };
+    if (!isFocused) abort();
+    const listener=AppState.addEventListener("change",state=>{if(state!=="active") abort();});
+    return () => {abort(); listener.remove();};
+  }, [isFocused]);
   const [hasInProgressRide, setHasInProgressRide] = useState(false);
   const [inProgressRideId, setInProgressRideId] = useState<string | null>(null);
   const [pickupCodeModalVisible, setPickupCodeModalVisible] = useState(false);
@@ -208,12 +147,29 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     permissionStatus,
     requestPermission,
     isSharingLocation,
-    setHighFrequencyMode,
     isHighFrequencyMode,
     lastKnownCoordinates,
-    setActiveBookingId,
     refreshLocation,
   } = useLocationService();
+
+  const loadDirections = async () => {
+    if (!job || routeRequestRef.current || !isFocused || AppState.currentState !== "active") return;
+    const destination = job.status === "PICKED_UP" ? job.dropCoords : job.pickupCoords;
+    if (!destination) { Alert.alert("Directions", "Destination coordinates are unavailable."); return; }
+    const controller = new AbortController();
+    routeRequestRef.current=controller; setRouteLoading(true);
+    try {
+      const origin=await refreshLocation() ?? lastKnownCoordinates;
+      if (controller.signal.aborted || AppState.currentState !== "active") return;
+      if (!origin) throw new Error("Enable location to get directions from your current position.");
+      const route=await fetchDriverRoute(origin,destination,controller.signal);
+      if (!controller.signal.aborted) { setRouteDetails(route); setIsMapFullscreen(true); }
+    } catch (error) {
+      if (!controller.signal.aborted) Alert.alert("Directions unavailable", "Please check your connection and try again.");
+    } finally {
+      if (routeRequestRef.current===controller) {routeRequestRef.current=null; setRouteLoading(false);}
+    }
+  };
 
   // Determine if map should be shown (active ride statuses only)
   const showMap = job && ACTIVE_RIDE_STATUSES.includes(job.status);
@@ -460,41 +416,6 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     checkForInProgressRides();
   }, [fetchDetails, checkForInProgressRides]);
 
-  // Enable high-frequency location updates when on an active ride
-  useEffect(() => {
-    if (!job) {
-      return;
-    }
-
-    const needsHighFrequency = ACTIVE_RIDE_STATUSES.includes(job.status);
-    const isTerminal = TERMINAL_STATUSES.includes(job.status);
-
-    if (needsHighFrequency) {
-      setHighFrequencyMode(true);
-    } else if (isTerminal) {
-      setHighFrequencyMode(false);
-    }
-
-    // No unmount cleanup here: navigating away from this screen (e.g. to
-    // Google Maps, or back to the jobs list) must NOT stop tracking for a
-    // ride that's still in progress. Tracking only turns off above, when the
-    // ride's status itself reaches a terminal state.
-  }, [job?.status, setHighFrequencyMode]);
-
-  // Attach the active booking/job id to location updates while on an active ride
-  useEffect(() => {
-    if (!job) {
-      return;
-    }
-
-    const isActiveRide = ACTIVE_RIDE_STATUSES.includes(job.status);
-    setActiveBookingId(isActiveRide ? job.id : null);
-
-    // No unmount cleanup here, for the same reason as the high-frequency
-    // effect above: leaving this screen must not clear the active booking
-    // (and thereby stop background tracking) while the ride is still active.
-  }, [job?.id, job?.status, setActiveBookingId]);
-
   const performStatusUpdate = useCallback(
     async (nextStatus: JobStatus, reason?: string) => {
       if (!job) {
@@ -673,7 +594,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const isJobTerminal = job ? TERMINAL_STATUSES.includes(job.status) : false;
   const needsAssignmentAck =
     !!job &&
-    job.status === "ASSIGNED" &&
+    ["ASSIGNED", "EN_ROUTE", "ARRIVED", "PICKED_UP"].includes(job.status) &&
     !job.assignmentAcknowledgedAt;
 
   const handleAcknowledgeAssignment = useCallback(async () => {
@@ -691,18 +612,31 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
       }));
       emitJobRefresh();
       showSuccessToast(
-        "Job acknowledged",
+        "Assignment confirmed",
         "Dispatch can see you received this booking.",
       );
     } catch (error) {
       showErrorToast(
-        "Acknowledgement failed",
+        "Confirmation failed",
         getErrorMessage(error, "Please try again."),
       );
     } finally {
       setAckLoading(false);
     }
   }, [ackLoading, job]);
+
+  const assignmentConfirmation = needsAssignmentAck ? (
+    <View style={{ padding: 12 }}>
+      <Text style={{ color: colors.text, marginBottom: 8 }}>
+        Please confirm you received this ride. This does not start the trip.
+      </Text>
+      <Pressable style={styles.primaryAction} onPress={handleAcknowledgeAssignment} disabled={ackLoading}>
+        {ackLoading ? <ActivityIndicator color="#fff" /> : (
+          <Text style={styles.primaryActionLabel}>Got it, confirmed</Text>
+        )}
+      </Pressable>
+    </View>
+  ) : null;
 
   const paymentMethodNormalized = useMemo(() => {
     const method = job?.paymentMethod ?? "";
@@ -886,7 +820,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             pickupAddress={pickupAddress}
             dropAddress={dropoffAddress}
             fullScreen
-            showDirections
+            routeDetails={routeDetails}
             estimatedTime={estimatedTime}
             estimatedDistance={
               job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined
@@ -905,25 +839,8 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
           <View style={styles.fullscreenNavigateContainer}>
             <Pressable
               style={styles.navigateOverlayButton}
-              onPress={() => {
-                const destination =
-                  job.status === "PICKED_UP" && job.dropCoords
-                    ? {
-                        lat: job.dropCoords.lat,
-                        lng: job.dropCoords.lng,
-                        label: "Drop-off",
-                      }
-                    : job.pickupCoords
-                      ? {
-                          lat: job.pickupCoords.lat,
-                          lng: job.pickupCoords.lng,
-                          label: "Pickup",
-                        }
-                      : null;
-                if (destination) {
-                  openNavigationChooser(destination.lat, destination.lng, destination.label);
-                }
-              }}
+              onPress={loadDirections}
+              disabled={routeLoading}
             >
               <Text style={styles.navigateOverlayButtonText}>
                 🧭 Navigate to{" "}
@@ -938,6 +855,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
     // Normal view: Map at top, details panel below (no overlap)
     return (
       <View style={styles.activeRideContainer}>
+        {assignmentConfirmation}
         {/* Map section - top aligned */}
         <View style={styles.mapSection}>
           <RideMapView
@@ -947,7 +865,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             status={job.status}
             pickupAddress={pickupAddress}
             dropAddress={dropoffAddress}
-            showDirections
+            routeDetails={routeDetails}
             estimatedTime={estimatedTime}
             estimatedDistance={
               job.distanceKm ? `${job.distanceKm.toFixed(1)} km` : undefined
@@ -1088,51 +1006,32 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
             </View>
           </View>
 
-          {/* Navigate to Pickup/Drop button */}
+          {/* Directions to Pickup/Drop button */}
           {job.status === "EN_ROUTE" && job.pickupCoords && (
             <Pressable
               style={styles.navigateButton}
-              onPress={() => {
-                const { lat, lng } = job.pickupCoords!;
-                openNavigationChooser(lat, lng, "Pickup");
-              }}
+              onPress={loadDirections}
+              disabled={routeLoading}
             >
               <Text style={styles.navigateButtonText}>
-                🧭 Navigate to Pickup
+                🧭 Directions to Pickup
               </Text>
             </Pressable>
           )}
           {job.status === "PICKED_UP" && job.dropCoords && (
             <Pressable
               style={styles.navigateButton}
-              onPress={() => {
-                const { lat, lng } = job.dropCoords!;
-                openNavigationChooser(lat, lng, "Drop-off");
-              }}
+              onPress={loadDirections}
+              disabled={routeLoading}
             >
               <Text style={styles.navigateButtonText}>
-                🧭 Navigate to Drop-off
+                🧭 Directions to Drop-off
               </Text>
             </Pressable>
           )}
 
           {/* Action buttons */}
           <View style={styles.overlayActionsContainer}>
-            {needsAssignmentAck && (
-              <Pressable
-                style={styles.overlayPrimaryAction}
-                onPress={handleAcknowledgeAssignment}
-                disabled={ackLoading}
-              >
-                {ackLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.overlayPrimaryActionLabel}>
-                    Acknowledge Job
-                  </Text>
-                )}
-              </Pressable>
-            )}
             {nextStatus && (
               <Pressable
                 style={styles.overlayPrimaryAction}
@@ -1496,6 +1395,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   // Non-active ride: Regular scrollable layout
   return (
     <Screen>
+      {assignmentConfirmation}
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
@@ -1705,21 +1605,6 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
               </View>
             )}
 
-            {needsAssignmentAck && (
-              <Pressable
-                style={styles.primaryAction}
-                onPress={handleAcknowledgeAssignment}
-                disabled={ackLoading}
-              >
-                {ackLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.primaryActionLabel}>
-                    Acknowledge Job
-                  </Text>
-                )}
-              </Pressable>
-            )}
 
             {nextStatus && (
               <Pressable

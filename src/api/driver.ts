@@ -1,3 +1,6 @@
+import { rememberAssignmentConfirmation } from '../utils/mergeDriverJob';
+import { stopAssignmentAlarm } from '../services/assignmentAlarm';
+import { emitAssignmentConfirmed } from '../utils/events';
 import axios from 'axios';
 
 import { apiClient } from './client';
@@ -255,7 +258,11 @@ export const updateDriverJobStatus = async (
 export const acknowledgeDriverJob = async (jobId: string): Promise<DriverJobDetail> => {
     try {
         const { data } = await apiClient.post<BackendJob>(`/driver/jobs/${jobId}/acknowledge`);
-        return mapBackendJobToDriverJobDetail(data);
+        const job = mapBackendJobToDriverJobDetail(data);
+        rememberAssignmentConfirmation(jobId, job.assignmentAcknowledgedAt ?? new Date().toISOString());
+        stopAssignmentAlarm(jobId);
+        emitAssignmentConfirmed({jobId, acknowledgedAt: job.assignmentAcknowledgedAt ?? new Date().toISOString()});
+        return job;
     } catch (error) {
         if (shouldUseMocks()) {
             return mockJobDetails(jobId);

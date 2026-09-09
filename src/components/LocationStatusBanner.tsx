@@ -6,27 +6,28 @@ import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
 
 export const LocationStatusBanner: React.FC = () => {
-  const { permissionStatus, isSharingLocation, requestPermission } = useLocationService();
+  const { permissionStatus, isSharingLocation, requestPermission, trackingError, backgroundTrackingActive, isHighFrequencyMode } = useLocationService();
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
+  const backgroundUnavailable = isHighFrequencyMode && !backgroundTrackingActive;
   const permissionGranted = permissionStatus === 'granted';
-  const showBanner = !permissionGranted || (permissionGranted && !isSharingLocation);
+  const showBanner = backgroundUnavailable || Boolean(trackingError) || !permissionGranted || !isSharingLocation;
 
   const isDenied = permissionStatus === 'denied';
   const isUndetermined = permissionStatus === 'undetermined';
 
-  const title = isDenied
+  const title = backgroundUnavailable ? 'Background tracking disabled' : isDenied
     ? 'Location access disabled'
     : isUndetermined
     ? 'Enable location access'
     : 'Location paused';
 
-  const description = isDenied
+  const description = backgroundUnavailable ? 'Enable background location for active rides. Allow location all the time in Settings and use an installed app build.' : trackingError ?? (isDenied
     ? 'Allow location access from settings so dispatch can see your live position.'
     : isUndetermined
-    ? 'Grant location access to keep dispatch informed about your whereabouts.'
-    : 'We will resume location sharing shortly. Keep the app open to stay visible.';
+    ? 'Tap enable when you are ready to share live location with dispatch.'
+    : 'Waiting for a confirmed location update from the server.');
 
   const handleAction = useCallback(async () => {
     if (isDenied) {
@@ -45,7 +46,7 @@ export const LocationStatusBanner: React.FC = () => {
     return null;
   }
 
-  const showActionButton = !permissionGranted;
+  const showActionButton = backgroundUnavailable || !permissionGranted || Boolean(trackingError);
 
   return (
     <View style={[styles.container, permissionGranted ? styles.paused : styles.warning]}>
@@ -64,11 +65,10 @@ export const LocationStatusBanner: React.FC = () => {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 16,
-    borderRadius: 16,
+    marginTop: 8,
+    marginBottom: 6,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -1,3 +1,5 @@
+import { mergeDriverJob, applyAssignmentConfirmation } from '../utils/mergeDriverJob';
+import { subscribeAssignmentConfirmed, subscribeJobRefresh } from '../utils/events';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DriverJob, getDriverJobs, JobStatus, JobType } from '../api/driver';
@@ -48,6 +50,8 @@ const normalizeIncomingJob = (payload: any, defaultType: JobType): DriverJob | n
 			passengerEmail: payload.passengerEmail,
 			scheduledTime: payload.pickupTime ?? payload.scheduledTime ?? new Date().toISOString(),
 			notes: payload.notes,
+            assignmentAcknowledgedAt: payload.assignmentAcknowledgedAt ?? payload.driverAssignmentAcknowledgedAt,
+            assignmentNotifiedAt: payload.assignmentNotifiedAt ?? payload.driverAssignmentNotifiedAt,
 			flightNo: payload.flightNo ?? null,
 			flightEta: payload.flightEta ?? null,
 		};
@@ -64,6 +68,7 @@ const extractJobId = (payload: any): string | null => {
 const extractPartialUpdate = (payload: any): Partial<DriverJob> => {
 	if (!payload || typeof payload !== 'object') return {};
 	const partial: Partial<DriverJob> = {};
+    if (payload.assignmentAcknowledgedAt || payload.driverAssignmentAcknowledgedAt) partial.assignmentAcknowledgedAt = payload.assignmentAcknowledgedAt ?? payload.driverAssignmentAcknowledgedAt;
 	if (payload.status) partial.status = payload.status;
 	if (payload.type) partial.type = payload.type;
 	if (payload.scheduledTime) partial.scheduledTime = payload.scheduledTime;
@@ -85,13 +90,24 @@ export const useRealtimeJobs = (type: JobType) => {
 	const loadBookings = useCallback(async () => {
 		try {
 			const data = await getDriverJobs(type);
-			setBookings(data);
+			setBookings(previous => data.map(job => {
+                const current = previous.find(item => item.id === job.id);
+                return current ? mergeDriverJob(current, job) : applyAssignmentConfirmation(job);
+            }));
 		} finally {
 			setIsLoading(false);
 			setRefreshing(false);
 			hasFetchedInitialRef.current = true;
 		}
 	}, [type]);
+
+    useEffect(() => {
+        const confirmed = subscribeAssignmentConfirmed(({jobId, acknowledgedAt}) => {
+            setBookings(previous => previous.map(job => job.id === jobId ? {...job, assignmentAcknowledgedAt: acknowledgedAt} : job));
+        });
+        const refreshSubscription = subscribeJobRefresh(() => { void loadBookings().catch(console.warn); });
+        return () => { confirmed.remove(); refreshSubscription.remove(); };
+    }, [loadBookings]);
 
 	const refresh = useCallback(() => {
 		setRefreshing(true);
@@ -114,16 +130,16 @@ export const useRealtimeJobs = (type: JobType) => {
 				if (existingIndex >= 0) {
 					// Merge details but preserve order
 					const next = prev.slice();
-					next[existingIndex] = { ...next[existingIndex], ...job };
+					next[existingIndex] = mergeDriverJob(next[existingIndex], job);
 					return next;
 				}
 				// Insert without refetching whole list
-				return [job, ...prev];
+				return [applyAssignmentConfirmation(job), ...prev];
 			});
 		};
 
 		const onStatusUpdated = (payload: BookingStatusUpdatedPayload) => {
-			const jobId = extractJobId(payload);
+			const jobId = extractJobId(payload?.booking ?? payload?.job ?? payload);
 			if (!jobId) return;
 
 			// Payload might include full job or just partial fields.
@@ -134,7 +150,7 @@ export const useRealtimeJobs = (type: JobType) => {
 				const idx = prev.findIndex((j) => j.id === jobId);
 				if (idx === -1) return prev;
 
-				const updated: DriverJob = { ...prev[idx], ...partial };
+				const updated: DriverJob = mergeDriverJob(prev[idx], partial);
 				const updatedType: JobType =
 					updated.type ?? STATUS_TO_TYPE_FALLBACK(updated.status, updated.scheduledTime);
 

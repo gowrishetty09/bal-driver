@@ -1,90 +1,102 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
-import { Alert, Platform } from 'react-native';
-
+import { Alert, AppState, Linking, Platform } from 'react-native';
 import { API_BASE_URL } from '../utils/config';
-import { SESSION_KEY } from '../context/AuthContext';
-import { deriveSessionTokens, isTokenExpired, SessionTokens, TokenResponse } from '../types/auth';
+import { getLocationSession } from './locationSession';
 
 export const DRIVER_BACKGROUND_LOCATION_TASK = 'bal-driver-background-location';
-
-const BACKGROUND_LOCATION_INTERVAL_MS = 5_000;
-const BACKGROUND_LOCATION_DISTANCE_M = 10;
 const BACKGROUND_LOCATION_DISCLOSURE_KEY = 'backgroundLocationDisclosureAccepted';
 const ACTIVE_BACKGROUND_BOOKING_ID_KEY = 'activeBackgroundLocationBookingId';
-
-const readStoredSession = async (): Promise<SessionTokens | null> => {
-  const raw = await SecureStore.getItemAsync(SESSION_KEY);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as SessionTokens;
-  } catch {
-    return null;
-  }
+const PENDING_KEY = 'driverPendingLocationV2';
+const STATUS_KEY = 'driverTrackingStatusV2';
+export type TrackingSample = {
+  latitude: number; longitude: number; timestamp: string;
+  heading?: number; speed?: number; accuracy?: number;
+  bookingId?: string; trackingOnly?: boolean;
 };
-
-const writeStoredSession = async (tokens: SessionTokens) => {
-  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(tokens));
+export type TrackingStatus = {
+  lastSentAt?: string; sample?: TrackingSample; error?: string | null;
 };
-
-const getUsableAccessToken = async (): Promise<string | null> => {
-  const tokens = await readStoredSession();
-  if (!tokens?.accessToken) return null;
-
-  if (!isTokenExpired(tokens.accessTokenExpiresAt)) {
-    return tokens.accessToken;
-  }
-
-  if (!tokens.refreshToken || isTokenExpired(tokens.refreshTokenExpiresAt)) {
-    return null;
-  }
-
-  try {
-    const { data } = await axios.post<TokenResponse>(`${API_BASE_URL}/auth/refresh`, {
-      refreshToken: tokens.refreshToken,
-    });
-    const nextTokens = deriveSessionTokens(data);
-    await writeStoredSession(nextTokens);
-    return nextTokens.accessToken;
-  } catch {
-    return null;
-  }
-};
-
-const sendBackgroundLocation = async (location: Location.LocationObject) => {
-  const token = await getUsableAccessToken();
-  if (!token) return;
-
-  const bookingId = await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
-
-  await axios.post(
-    `${API_BASE_URL}/driver/location`,
-    {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      ...(bookingId ? { bookingId } : {}),
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      timeout: 15000,
-    },
-  );
-};
-
-export const setBackgroundLocationBookingId = async (bookingId: string | null): Promise<void> => {
-  if (bookingId) {
-    await AsyncStorage.setItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY, bookingId);
-    return;
-  }
-
-  await AsyncStorage.removeItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
-};
+const listeners = new Set<(status: TrackingStatus) => void>();
+let pending: TrackingSample | null = null;
+let sending: Promise<void> | null = null;
+let lastRequestAt = 0;
+let operation: Promise<unknown> = Promise.resolve();
+let lifecycleVersion = 0;
+let sampleVersion = 0;
+export function subscribeTracking(listener: (status: TrackingStatus) => void) {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+async function report(status: TrackingStatus) {
+  listeners.forEach(listener => listener(status));
+  const previous = await readTrackingStatus();
+  await AsyncStorage.setItem(STATUS_KEY, JSON.stringify({ ...previous, ...status }));
+}
+export async function readTrackingStatus(): Promise<TrackingStatus> {
+  const raw = await AsyncStorage.getItem(STATUS_KEY);
+  try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+export function locationSample(location: Location.LocationObject): TrackingSample {
+  return {
+    latitude: location.coords.latitude, longitude: location.coords.longitude,
+    timestamp: new Date(location.timestamp).toISOString(),
+    heading: location.coords.heading != null && location.coords.heading >= 0 ? location.coords.heading : undefined,
+    speed: location.coords.speed != null && location.coords.speed >= 0 ? location.coords.speed : undefined,
+    accuracy: location.coords.accuracy ?? undefined,
+  };
+}
+export async function publishLocation(sample: TrackingSample): Promise<void> {
+  const revision = ++sampleVersion;
+  listeners.forEach(listener => listener({ sample }));
+  pending = sample;
+  await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(sample));
+  if (revision !== sampleVersion) return;
+  await flushPendingLocation();
+}
+export async function flushPendingLocation(): Promise<void> {
+  if (sending) return sending;
+  if (Date.now() - lastRequestAt < 4000) return;
+  sending = (async () => {
+    const raw = pending ? null : await AsyncStorage.getItem(PENDING_KEY);
+    let sample = pending;
+    if (!sample && raw) { try { sample = JSON.parse(raw); } catch { return; } }
+    if (!sample) return;
+    if (sample.trackingOnly && await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY) !== sample.bookingId) {
+      pending = null; await AsyncStorage.removeItem(PENDING_KEY); return;
+    }
+    let session = await getLocationSession();
+    if (!session) { await report({ error: 'Sign in again to share location.' }); return; }
+    lastRequestAt = Date.now();
+    const send = (token: string) => axios.post<{trackingActive?: boolean}>(API_BASE_URL + '/driver/location', sample,
+      { headers: { Authorization: 'Bearer ' + token }, timeout: 15000 });
+    let response;
+    try { response = await send(session.accessToken); }
+    catch (error) {
+      if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;
+      session = await getLocationSession(session.accessToken);
+      if (!session) throw new Error('Sign in again to share location.');
+      response = await send(session.accessToken);
+    }
+    if (response.data.trackingActive === false && sample.trackingOnly) {
+      if (await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY) === sample.bookingId) {
+        await configureBackgroundTracking(null);
+      }
+    } else {
+      await report({ lastSentAt: sample.timestamp, sample, error: null });
+    }
+    // A newer fix may have arrived while this HTTP request was in flight.
+    if (!pending || pending.timestamp === sample.timestamp) {
+      pending = null; await AsyncStorage.removeItem(PENDING_KEY);
+    }
+  })().catch(async error => {
+    await report({ error: 'Location upload failed. Retrying when connected.' });
+    console.warn('[Tracking] upload failed', axios.isAxiosError(error) ? error.response?.status ?? error.code : String(error));
+  }).finally(() => { sending = null; });
+  return sending;
+}
 
 const confirmBackgroundLocationDisclosure = async (): Promise<boolean> => {
   const accepted = await AsyncStorage.getItem(BACKGROUND_LOCATION_DISCLOSURE_KEY);
@@ -113,75 +125,73 @@ const confirmBackgroundLocationDisclosure = async (): Promise<boolean> => {
   });
 };
 
-TaskManager.defineTask(
-  DRIVER_BACKGROUND_LOCATION_TASK,
-  async ({ data, error }: TaskManager.TaskManagerTaskBody<{ locations?: Location.LocationObject[] }>) => {
-    if (error) {
-      console.log('[BackgroundLocation] task error:', error.message);
-      return;
-    }
 
-    const locations = data?.locations;
-    const latest = Array.isArray(locations) ? locations[locations.length - 1] : null;
-    if (!latest) return;
+export async function ensureBackgroundLocationPermission(): Promise<boolean> {
+  if (Platform.OS === 'web' || AppState.currentState !== 'active') return false;
+  if (!await TaskManager.isAvailableAsync()) return false;
+  const foreground = await Location.requestForegroundPermissionsAsync();
+  if (foreground.status !== 'granted') return false;
+  const background = await Location.getBackgroundPermissionsAsync();
+  if (background.status === 'granted') return true;
+  if (background.canAskAgain === false) {
+    Alert.alert('Enable background location', 'Allow location access all the time in Settings to track active rides with the screen locked.',
+      [{ text: 'Cancel', style: 'cancel' }, { text: 'Open settings', onPress: () => { void Linking.openSettings(); } }]);
+    return false;
+  }
+  if (!await confirmBackgroundLocationDisclosure()) return false;
+  return (await Location.requestBackgroundPermissionsAsync()).status === 'granted';
+}
 
-    try {
-      await sendBackgroundLocation(latest);
-    } catch (sendError) {
-      console.log('[BackgroundLocation] send failed:', sendError);
-    }
-  },
-);
-
-export const ensureBackgroundLocationPermission = async (): Promise<boolean> => {
-  const foreground = await Location.getForegroundPermissionsAsync();
-  if (foreground.status !== Location.PermissionStatus.GRANTED) {
-    const requestedForeground = await Location.requestForegroundPermissionsAsync();
-    if (requestedForeground.status !== Location.PermissionStatus.GRANTED) {
+// Serialize native start/stop, but invalidate a pending permission dialog immediately.
+export function configureBackgroundTracking(bookingId: string | null, requestPermission = false): Promise<boolean> {
+  const revision = ++lifecycleVersion;
+  const run = async () => {
+    if (revision !== lifecycleVersion) return false;
+    if (!bookingId) {
+      await AsyncStorage.removeItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
+      pending = null;
+      await AsyncStorage.removeItem(PENDING_KEY);
+      await AsyncStorage.removeItem(STATUS_KEY);
+      lastRequestAt = 0;
+      if (await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK)) {
+        await Location.stopLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK);
+      }
       return false;
     }
-  }
-
-  const background = await Location.getBackgroundPermissionsAsync();
-  if (background.status === Location.PermissionStatus.GRANTED) {
+    const granted = requestPermission ? await ensureBackgroundLocationPermission()
+      : (await Location.getBackgroundPermissionsAsync()).status === 'granted';
+    if (revision !== lifecycleVersion) return false;
+    if (!granted) return false;
+    await AsyncStorage.setItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY, bookingId);
+    if (!await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK)) {
+      // Start while visible; the OS owns delivery when JS screens are suspended.
+      if (AppState.currentState !== 'active') return false;
+      await Location.startLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK, {
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000, distanceInterval: 0,
+        pausesUpdatesAutomatically: false,
+        activityType: Location.ActivityType.AutomotiveNavigation,
+        showsBackgroundLocationIndicator: true,
+        foregroundService: {
+          notificationTitle: 'BAL Driver live tracking',
+          notificationBody: 'Sharing location for your active ride.',
+          notificationColor: '#151e2d', killServiceOnDestroy: false,
+        },
+      });
+    }
     return true;
-  }
+  };
+  const result = operation.catch(() => {}).then(run);
+  operation = result;
+  return result;
+}
 
-  if (Platform.OS !== 'web') {
-    const consented = await confirmBackgroundLocationDisclosure();
-    if (!consented) return false;
-  }
-
-  const requestedBackground = await Location.requestBackgroundPermissionsAsync();
-  return requestedBackground.status === Location.PermissionStatus.GRANTED;
-};
-
-export const startBackgroundLocationTracking = async (): Promise<boolean> => {
-  const hasPermission = await ensureBackgroundLocationPermission();
-  if (!hasPermission) return false;
-
-  const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK);
-  if (alreadyStarted) return true;
-
-  await Location.startLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: BACKGROUND_LOCATION_INTERVAL_MS,
-    distanceInterval: BACKGROUND_LOCATION_DISTANCE_M,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: 'BAL Driver live tracking',
-      notificationBody: 'Sharing your location during the active ride.',
-      notificationColor: '#151e2d',
-    },
+TaskManager.defineTask(DRIVER_BACKGROUND_LOCATION_TASK,
+  async ({ data, error }: TaskManager.TaskManagerTaskBody<{locations?: Location.LocationObject[]}>) => {
+    if (error) { await report({ error: error.message }); return; }
+    const bookingId = await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
+    if (!bookingId) { await configureBackgroundTracking(null); return; }
+    const latest = data?.locations?.slice(-1)[0];
+    if (!latest) return;
+    await publishLocation({ ...locationSample(latest), bookingId, trackingOnly: true });
   });
-
-  return true;
-};
-
-export const stopBackgroundLocationTracking = async (): Promise<void> => {
-  const started = await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK);
-  if (started) {
-    await Location.stopLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK);
-  }
-};

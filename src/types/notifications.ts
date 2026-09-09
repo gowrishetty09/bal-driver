@@ -2,7 +2,7 @@
  * Expo Push Notification Types
  */
 
-export type NotificationType = 'NEW_RIDE' | 'RIDE_CANCELLED' | 'SOS_MESSAGE' | 'ADMIN_REASSIGNMENT' | 'PICKUP_ALERT';
+export type NotificationType = 'NEW_RIDE' | 'RIDE_CANCELLED' | 'SOS_MESSAGE' | 'ADMIN_REASSIGNMENT' | 'PICKUP_ALERT' | 'RIDE_UPDATE' | 'GENERAL';
 
 export type PushNotificationPayload = {
     notificationType: NotificationType;
