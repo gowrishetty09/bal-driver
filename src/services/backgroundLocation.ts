@@ -17,7 +17,7 @@ export type TrackingSample = {
   bookingId?: string; trackingOnly?: boolean;
 };
 export type TrackingStatus = {
-  lastSentAt?: string; sample?: TrackingSample; error?: string | null;
+  lastSentAt?: string; lastAcknowledgedAt?: string; sample?: TrackingSample; error?: string | null;
 };
 const listeners = new Set<(status: TrackingStatus) => void>();
 let pending: TrackingSample | null = null;
@@ -25,6 +25,7 @@ let sending: Promise<void> | null = null;
 let lastRequestAt = 0;
 let operation: Promise<unknown> = Promise.resolve();
 let lifecycleVersion = 0;
+let configuredInThisSession = false;
 let sampleVersion = 0;
 export function subscribeTracking(listener: (status: TrackingStatus) => void) {
   listeners.add(listener);
@@ -85,7 +86,7 @@ export async function flushPendingLocation(): Promise<void> {
         await configureBackgroundTracking(null);
       }
     } else {
-      await report({ lastSentAt: sample.timestamp, sample, error: null });
+      await report({ lastSentAt: sample.timestamp, lastAcknowledgedAt: new Date().toISOString(), sample, error: null });
     }
     // A newer fix may have arrived while this HTTP request was in flight.
     if (!pending || pending.timestamp === sample.timestamp) {
@@ -125,11 +126,17 @@ const confirmBackgroundLocationDisclosure = async (): Promise<boolean> => {
   });
 };
 
+export async function requestForegroundLocationPermissionWithDisclosure(): Promise<Location.PermissionResponse> {
+  const foreground = await Location.getForegroundPermissionsAsync();
+  if (foreground.status === 'granted') return foreground;
+  if (!await confirmBackgroundLocationDisclosure()) return foreground;
+  return Location.requestForegroundPermissionsAsync();
+}
 
 export async function ensureBackgroundLocationPermission(): Promise<boolean> {
   if (Platform.OS === 'web' || AppState.currentState !== 'active') return false;
   if (!await TaskManager.isAvailableAsync()) return false;
-  const foreground = await Location.requestForegroundPermissionsAsync();
+  let foreground = await requestForegroundLocationPermissionWithDisclosure();
   if (foreground.status !== 'granted') return false;
   const background = await Location.getBackgroundPermissionsAsync();
   if (background.status === 'granted') return true;
@@ -138,7 +145,6 @@ export async function ensureBackgroundLocationPermission(): Promise<boolean> {
       [{ text: 'Cancel', style: 'cancel' }, { text: 'Open settings', onPress: () => { void Linking.openSettings(); } }]);
     return false;
   }
-  if (!await confirmBackgroundLocationDisclosure()) return false;
   return (await Location.requestBackgroundPermissionsAsync()).status === 'granted';
 }
 
@@ -148,6 +154,7 @@ export function configureBackgroundTracking(bookingId: string | null, requestPer
   const run = async () => {
     if (revision !== lifecycleVersion) return false;
     if (!bookingId) {
+      configuredInThisSession = false;
       await AsyncStorage.removeItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);
       pending = null;
       await AsyncStorage.removeItem(PENDING_KEY);
@@ -163,7 +170,7 @@ export function configureBackgroundTracking(bookingId: string | null, requestPer
     if (revision !== lifecycleVersion) return false;
     if (!granted) return false;
     await AsyncStorage.setItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY, bookingId);
-    if (!await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK)) {
+    if (!configuredInThisSession || !await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK)) {
       // Start while visible; the OS owns delivery when JS screens are suspended.
       if (AppState.currentState !== 'active') return false;
       await Location.startLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK, {
@@ -179,6 +186,7 @@ export function configureBackgroundTracking(bookingId: string | null, requestPer
         },
       });
     }
+    configuredInThisSession = true;
     return true;
   };
   const result = operation.catch(() => {}).then(run);

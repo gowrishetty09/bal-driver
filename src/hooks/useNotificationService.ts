@@ -298,6 +298,10 @@ export const useNotificationService = () => {
             // Set pending navigation to be handled by a component inside NavigationContainer
             setPendingNavigation(navigationAction);
         }
+
+        Notifications.clearLastNotificationResponseAsync().catch((error) => {
+            console.warn('Failed to clear last notification response:', error);
+        });
     }, [upsertNotification]);
 
     // Load persisted notifications once

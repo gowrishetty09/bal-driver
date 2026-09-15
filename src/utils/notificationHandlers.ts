@@ -5,6 +5,8 @@
 import { Platform, Vibration } from 'react-native';
 import { NotificationType } from '../types/notifications';
 
+type NotificationData = Record<string, string | number | boolean>;
+
 /**
  * Trigger vibration based on notification type
  */
@@ -46,7 +48,7 @@ export const triggerVibration = (notificationType: NotificationType): void => {
  * Backend sends 'type' field with values like 'DRIVER_ASSIGNED', 'RIDE_STARTED', etc.
  * Mobile uses 'notificationType' with values like 'NEW_RIDE', 'RIDE_CANCELLED', etc.
  */
-export const getNotificationType = (data?: Record<string, string | number | boolean>): NotificationType => {
+export const getNotificationType = (data?: NotificationData): NotificationType => {
     if (!data) {
         return 'GENERAL';
     }
@@ -87,19 +89,38 @@ export const getNotificationType = (data?: Record<string, string | number | bool
     }
 };
 
+export const getNotificationBookingId = (data?: NotificationData): string | null => {
+    if (!data) {
+        return null;
+    }
+
+    const rawId =
+        data.jobId ??
+        data.bookingId ??
+        data.rideId ??
+        data.entityId ??
+        data.id;
+
+    if (typeof rawId !== 'string' && typeof rawId !== 'number') {
+        return null;
+    }
+
+    const bookingId = String(rawId).trim();
+    return bookingId ? bookingId : null;
+};
+
 /**
  * Handle notification tap/press action
  * Returns navigation params for routing
  * Backend sends entityId for booking ID, mobile sends jobId
  */
-export const handleNotificationPress = (data?: Record<string, string | number | boolean>) => {
+export const handleNotificationPress = (data?: NotificationData) => {
     if (!data) {
         return { screen: 'RidesTab' };
     }
 
     const notificationType = getNotificationType(data);
-    // Backend sends entityId, mobile sends jobId - support both
-    const jobId = data.jobId || data.entityId;
+    const jobId = getNotificationBookingId(data);
 
     switch (notificationType) {
         case 'NEW_RIDE':
@@ -132,7 +153,7 @@ export const handleNotificationPress = (data?: Record<string, string | number | 
  */
 export const logNotification = (
     notificationType: NotificationType,
-    data?: Record<string, string | number | boolean>,
+    data?: NotificationData,
 ): void => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] Notification received:`, {

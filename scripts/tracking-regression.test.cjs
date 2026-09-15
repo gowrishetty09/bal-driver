@@ -17,11 +17,11 @@ function setup(){
   const storage=new Map();let handler;let started=false;let starts=0;let stops=0;let now=Date.now();let response={data:{trackingActive:true}};
   const calls=[];
   const store={getItem:async key=>storage.get(key)??null,setItem:async(key,value)=>storage.set(key,value),removeItem:async key=>storage.delete(key)};
-  const location={Accuracy:{High:4},ActivityType:{AutomotiveNavigation:1},getBackgroundPermissionsAsync:async()=>({status:'granted'}),hasStartedLocationUpdatesAsync:async()=>started,startLocationUpdatesAsync:async(name,options)=>{starts++;started=true;assert.equal(options.foregroundService.killServiceOnDestroy,false)},stopLocationUpdatesAsync:async()=>{stops++;started=false}};
+  const location={getForegroundPermissionsAsync:async()=>({status:'granted'}),requestForegroundPermissionsAsync:async()=>{throw Error('Must not reopen granted permission');},Accuracy:{High:4},ActivityType:{AutomotiveNavigation:1},getBackgroundPermissionsAsync:async()=>({status:'granted'}),hasStartedLocationUpdatesAsync:async()=>started,startLocationUpdatesAsync:async(name,options)=>{starts++;started=true;assert.equal(options.foregroundService.killServiceOnDestroy,false)},stopLocationUpdatesAsync:async()=>{stops++;started=false}};
   const axios={post:async(...args)=>{calls.push(args);if(response instanceof Error)throw response;return typeof response==='function'?response():response},isAxiosError:e=>e?.isAxiosError===true};
   class Clock extends Date {static now(){return now}}
   const api=load('src/services/backgroundLocation.ts',{'axios':axios,'@react-native-async-storage/async-storage':store,'expo-location':location,'expo-task-manager':{defineTask:(name,fn)=>handler=fn,isAvailableAsync:async()=>true},'react-native':{AppState:{currentState:'active'},Platform:{OS:'android'},Alert:{alert(){}},Linking:{openSettings:async()=>{}}},'../utils/config':{API_BASE_URL:'https://backend.test'},'./locationSession':{getLocationSession:async()=>({accessToken:'token'})}},Clock);
-  return {api,storage,calls,task:data=>handler({data}),tick:()=>now+=5000,setResponse:value=>response=value,counts:()=>({starts,stops,started})};
+  return {api,storage,calls,location,task:data=>handler({data}),tick:()=>now+=5000,setResponse:value=>response=value,counts:()=>({starts,stops,started})};
 }
 const fix=(timestamp=Date.now())=>({coords:{latitude:3,longitude:101,heading:45,speed:5,accuracy:8},timestamp});
 test('native tracking starts once and background GPS uses only the location endpoint',async()=>{
@@ -64,4 +64,38 @@ test('temporary refresh failures do not log the driver out, but rejected credent
     await assert.rejects(interceptor({response:{status:401},config:{headers:{}}}),/refresh failed/);
     assert.equal(logouts,unauthorized?1:0);
   }
+});
+
+test('passive reconciliation recovers after background permission is granted in Settings',async()=>{
+ const h=setup();h.location.getBackgroundPermissionsAsync=async()=>({status:'denied'});
+ assert.equal(await h.api.configureBackgroundTracking('ride-1'),false);
+ assert.equal(h.counts().starts,0);
+ h.location.getBackgroundPermissionsAsync=async()=>({status:'granted'});
+ assert.equal(await h.api.configureBackgroundTracking('ride-1'),true);
+ assert.equal(await h.api.configureBackgroundTracking('ride-1'),true);
+ assert.equal(h.counts().starts,1);
+});
+
+test('already granted permissions never reopen Android permission activity on resume',async()=>{
+ const h=setup();h.location.getForegroundPermissionsAsync=async()=>({status:'granted'});
+ h.location.requestForegroundPermissionsAsync=async()=>{throw Error('Must not reopen granted permission');};
+ assert.equal(await h.api.configureBackgroundTracking('ride-1',true),true);
+ assert.equal(await h.api.configureBackgroundTracking('ride-1',true),true);
+ assert.equal(h.counts().starts,1);
+});
+
+test('restores a persisted native registration once after a fresh JS launch',async()=>{
+ const h=setup();h.location.hasStartedLocationUpdatesAsync=async()=>true;
+ assert.equal(await h.api.configureBackgroundTracking('ride-1'),true);
+ assert.equal(await h.api.configureBackgroundTracking('ride-1'),true);
+ assert.equal(h.counts().starts,1);
+});
+
+test('successful upload records receipt time separately from the GPS capture time',async()=>{
+ const h=setup();await h.api.configureBackgroundTracking('ride-1');
+ const captured=Date.now()-60000;await h.task({locations:[fix(captured)]});
+ const status=await h.api.readTrackingStatus();
+ assert.equal(status.lastSentAt,new Date(captured).toISOString());
+ assert.ok(Date.parse(status.lastAcknowledgedAt)>captured+50000);
+ assert.equal(status.error,null);
 });

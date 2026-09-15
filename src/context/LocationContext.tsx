@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { subscribeJobRefresh } from '../utils/events';
 import {
   configureBackgroundTracking, flushPendingLocation, locationSample, publishLocation,
-  readTrackingStatus, subscribeTracking,
+  readTrackingStatus, requestForegroundLocationPermissionWithDisclosure, subscribeTracking,
 } from '../services/backgroundLocation';
 
 export type LocationPermissionState = Location.PermissionStatus | 'undetermined';
@@ -21,6 +21,7 @@ export type LocationContextValue = {
   lastKnownCoordinates: {latitude: number; longitude: number} | null;
   requestPermission: () => Promise<void>;
   isHighFrequencyMode: boolean;
+  backgroundTrackingStarting: boolean;
   refreshLocation: () => Promise<{latitude: number; longitude: number} | null>;
 };
 export const LocationContext = createContext<LocationContextValue | null>(null);
@@ -34,7 +35,10 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   const [activeBookingId, setActiveBookingId] = useState<string | null | undefined>();
   const [backgroundTrackingActive, setBackgroundTrackingActive] = useState(false);
   const backgroundRef = useRef(false);
+  const [backgroundTrackingStarting, setBackgroundTrackingStarting] = useState(false);
+  const [permissionRetry, setPermissionRetry] = useState(0);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [lastAcknowledgedAt, setLastAcknowledgedAt] = useState<string | null>(null);
   const [lastSentAt, setLastSentAt] = useState<string | null>(null);
   const [lastKnownCoordinates, setLastKnownCoordinates] = useState<{latitude:number;longitude:number} | null>(null);
   const latestFixTime = useRef(0);
@@ -55,7 +59,10 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    let cancelled = false;
     const apply = (status: Awaited<ReturnType<typeof readTrackingStatus>>) => {
+      if (cancelled) return;
+      if (status.lastAcknowledgedAt) setLastAcknowledgedAt(previous => !previous || Date.parse(status.lastAcknowledgedAt!) > Date.parse(previous) ? status.lastAcknowledgedAt! : previous);
       if (status.sample && Date.parse(status.sample.timestamp) >= latestFixTime.current) {
         latestFixTime.current = Date.parse(status.sample.timestamp);
         setLastKnownCoordinates({latitude:status.sample.latitude,longitude:status.sample.longitude});
@@ -66,7 +73,12 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     };
     const unsubscribe = subscribeTracking(apply);
     void readTrackingStatus().then(apply).catch(console.warn);
-    return unsubscribe;
+    // Headless tasks can run in a separate JS runtime, so their in-memory
+    // listeners cannot update this provider. Read their persisted receipt too.
+    const timer = appState === 'active' ? setInterval(() => {
+      void readTrackingStatus().then(apply).catch(console.warn);
+    }, 5000) : undefined;
+    return () => { cancelled = true; unsubscribe(); if (timer) clearInterval(timer); };
   }, [appState, isAuthenticated]);
 
   useEffect(() => {
@@ -77,7 +89,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   // Ride lifecycle belongs to the provider, never to a details screen.
   useEffect(() => {
     if (isInitializing) return;
-    if (!isAuthenticated) { latestFixTime.current = 0; setActiveBookingId(null); setLastSentAt(null); setLastKnownCoordinates(null); return; }
+    if (!isAuthenticated) { latestFixTime.current = 0; setActiveBookingId(null); setLastSentAt(null); setLastAcknowledgedAt(null); setLastKnownCoordinates(null); return; }
     let cancelled = false;
     let inFlight = false;
     const sync = async () => {
@@ -105,26 +117,40 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     if (isInitializing || activeBookingId === undefined) return;
     let cancelled = false;
     socketService.setCurrentBookingId(activeBookingId);
-    const configure = async () => {
+    const configure = async (askPermission = true) => {
+      if (cancelled) return;
+      if (askPermission) setBackgroundTrackingStarting(Boolean(activeBookingId) && !backgroundRef.current);
       try {
         const active = await configureBackgroundTracking(isAuthenticated ? activeBookingId : null,
-          Boolean(activeBookingId) && appState === 'active');
+          askPermission && Boolean(activeBookingId) && appState === 'active');
         if (cancelled) return;
         backgroundRef.current = active;
         setBackgroundTrackingActive(active);
         if (activeBookingId && !active) setTrackingError('Background tracking is not enabled. Allow location all the time in Settings.');
-        else setTrackingError(null);
+        else setTrackingError(previous => previous?.startsWith('Background tracking') || previous?.startsWith('Allow location') ? null : previous);
         const foreground = await Location.getForegroundPermissionsAsync();
         if (!cancelled) setPermissionStatus(foreground.status);
       } catch (error) {
         if (!cancelled) { backgroundRef.current = false; setBackgroundTrackingActive(false); setTrackingError('Background tracking could not start. Enable location permissions and use an installed app build.'); }
         console.warn('[Tracking] start failed', error);
+      } finally {
+        if (!cancelled) setBackgroundTrackingStarting(false);
       }
     };
     // A running native task continues without restarting when the app is hidden.
-    if (appState === 'active' || !activeBookingId || !isAuthenticated) void configure();
-    return () => { cancelled = true; };
-  }, [activeBookingId, isAuthenticated, isInitializing, appState]);
+    let inFlight = false;
+    const reconcile = async (askPermission: boolean) => {
+      if (inFlight) return;
+      inFlight = true;
+      try { await configure(askPermission); } finally { inFlight = false; }
+    };
+    if (appState === 'active' || !activeBookingId || !isAuthenticated) void reconcile(true);
+    // Reconcile after Android Settings and recover from delayed native startup.
+    // Passive retries never reopen a permission dialog.
+    const timer = appState === 'active' && activeBookingId && isAuthenticated
+      ? setInterval(() => { void reconcile(false); }, 5000) : undefined;
+    return () => { cancelled = true; if (timer) clearInterval(timer); };
+  }, [activeBookingId, isAuthenticated, isInitializing, appState, permissionRetry]);
 
   useEffect(() => {
     if (!isAuthenticated || permissionStatus !== 'granted' || appState !== 'active') return;
@@ -152,13 +178,9 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
 
   const requestPermission = useCallback(async () => {
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await requestForegroundLocationPermissionWithDisclosure();
       setPermissionStatus(permission.status);
-      if (activeBookingId && permission.status === 'granted') {
-        const active = await configureBackgroundTracking(activeBookingId, true);
-        backgroundRef.current=active; setBackgroundTrackingActive(active);
-        setTrackingError(active ? null : 'Allow location all the time in Settings for background tracking.');
-      }
+      if (permission.status === 'granted') setPermissionRetry(value => value + 1);
     } catch { setTrackingError('Unable to enable location. Check app permissions in Settings.'); }
   }, [activeBookingId]);
   const refreshLocation = useCallback(async () => {
@@ -169,9 +191,9 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       setLastKnownCoordinates(coords); return coords;
     } catch { return null; }
   }, [permissionStatus]);
-  const isSharingLocation = isAuthenticated && !trackingError && Boolean(lastSentAt && now-Date.parse(lastSentAt)<30000);
+  const isSharingLocation = isAuthenticated && !trackingError && Boolean(lastAcknowledgedAt && now-Date.parse(lastAcknowledgedAt)<30000);
   const value = useMemo(() => ({ permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,
-    lastSentAt,lastKnownCoordinates,requestPermission,isHighFrequencyMode:Boolean(activeBookingId),refreshLocation }),
-    [permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,lastSentAt,lastKnownCoordinates,requestPermission,activeBookingId,refreshLocation]);
+    lastSentAt,lastKnownCoordinates,requestPermission,isHighFrequencyMode:Boolean(activeBookingId),backgroundTrackingStarting,refreshLocation }),
+    [permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,lastSentAt,lastKnownCoordinates,requestPermission,activeBookingId,backgroundTrackingStarting,refreshLocation]);
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 };

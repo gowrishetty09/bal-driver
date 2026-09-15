@@ -6,6 +6,42 @@ import { useNavigation } from "@react-navigation/native";
 import { useNotificationContext } from "../../context/NotificationContext";
 import { handleNotificationPress } from "../../utils/notificationHandlers";
 import { useTheme, ThemeColors } from "../../context/ThemeContext";
+import { DriverNotification } from "../../hooks/useNotificationService";
+
+const fallbackTitle = (notification: DriverNotification) => {
+  switch (notification.notificationType) {
+    case "NEW_RIDE":
+      return "New ride assigned";
+    case "RIDE_CANCELLED":
+      return "Ride cancelled";
+    case "PICKUP_ALERT":
+      return "Pickup alert";
+    case "RIDE_UPDATE":
+      return "Ride update";
+    case "ADMIN_REASSIGNMENT":
+      return "Ride assignment updated";
+    case "SOS_MESSAGE":
+      return "SOS alert";
+    default:
+      return "Notification";
+  }
+};
+
+const fallbackBody = (notification: DriverNotification) => {
+  if (notification.body?.trim()) {
+    return notification.body;
+  }
+
+  const reference = notification.data?.jobReference ?? notification.data?.reference ?? notification.data?.bookingRef;
+  const bookingId = notification.data?.jobId ?? notification.data?.bookingId ?? notification.data?.rideId ?? notification.data?.entityId;
+  const rideLabel = reference || bookingId;
+
+  if (notification.notificationType === "NEW_RIDE") {
+    return rideLabel ? `Tap to view and confirm ride ${rideLabel}.` : "Tap to view and confirm the assigned ride.";
+  }
+
+  return rideLabel ? `Tap to view ride ${rideLabel}.` : "Tap to view details.";
+};
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -53,10 +89,10 @@ export const NotificationsScreen: React.FC = () => {
           <View style={styles.row}>
             <View style={styles.left}>
               <Text style={styles.title} numberOfLines={1}>
-                {n.title || "Notification"}
+                {n.title && n.title !== "Notification" ? n.title : fallbackTitle(n)}
               </Text>
               <Text style={styles.body} numberOfLines={2}>
-                {n.body}
+                {fallbackBody(n)}
               </Text>
               <Text style={styles.meta}>{formatDate(n.timestamp)}</Text>
             </View>
