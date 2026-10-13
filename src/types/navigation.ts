@@ -49,6 +49,8 @@ export type ExpensesStackParamList = {
 
 export type ProfileStackParamList = {
     DriverProfile: undefined;
+    Compliance: undefined;
+    EmergencyContacts: undefined;
     Feedback: FeedbackParams | undefined;
 };
 

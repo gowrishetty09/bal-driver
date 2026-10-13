@@ -296,6 +296,24 @@ export const DriverProfileScreen: React.FC = () => {
 
       {/* Settings Card */}
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Safety contacts</Text>
+        <Text style={styles.sectionSubtitle}>Manage family or trusted contacts for emergency use.</Text>
+        <Pressable style={styles.feedbackButton} onPress={() => navigation.navigate("EmergencyContacts")}><Ionicons name="people-outline" size={20} color={colors.brandGold}/><Text style={styles.feedbackButtonLabel}>Emergency Contacts</Text><Ionicons name="chevron-forward" size={20} color={colors.brandGold} style={styles.chevron}/></Pressable>
+      </View>
+
+      {/* Settings Card */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>E-hailing compliance</Text>
+        <Text style={styles.sectionSubtitle}>Upload and maintain your identity, PSV, vehicle grant, insurance and EVP.</Text>
+        <Pressable style={styles.feedbackButton} onPress={() => navigation.navigate("Compliance")}>
+          <Ionicons name="shield-checkmark-outline" size={20} color={colors.brandGold} />
+          <Text style={styles.feedbackButtonLabel}>Open Compliance Centre</Text>
+          <Ionicons name="chevron-forward" size={20} color={colors.brandGold} style={styles.chevron} />
+        </Pressable>
+      </View>
+
+      {/* Settings Card */}
+      <View style={styles.card}>
         <Text style={styles.sectionTitle}>Settings</Text>
         <Text style={styles.sectionSubtitle}>
           Customize your app experience

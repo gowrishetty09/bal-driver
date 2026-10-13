@@ -21,6 +21,8 @@ import { JobDetailsScreen } from "../screens/Jobs/JobDetailsScreen";
 import { AddExpenseScreen } from "../screens/Expenses/ExpensesScreen";
 import { ExpensesListScreen } from "../screens/Expenses/ExpensesListScreen";
 import { DriverProfileScreen } from "../screens/Profile/DriverProfileScreen";
+import { ComplianceScreen } from "../screens/Profile/ComplianceScreen";
+import { EmergencyContactsScreen } from "../screens/Profile/EmergencyContactsScreen";
 import { SupportListScreen } from "../screens/Support/SupportListScreen";
 import { SupportTicketDetailsScreen } from "../screens/Support/SupportTicketDetailsScreen";
 import { SupportNewTicketScreen } from "../screens/Support/SupportNewTicketScreen";
@@ -236,6 +238,16 @@ const ProfileStackNavigator = () => {
           title: "Profile",
           headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
         }}
+      />
+      <ProfileStack.Screen
+        name="Compliance"
+        component={ComplianceScreen}
+        options={{ title: "Compliance", headerRight: () => <AppVersionBadge /> }}
+      />
+      <ProfileStack.Screen
+        name="EmergencyContacts"
+        component={EmergencyContactsScreen}
+        options={{ title: "Emergency Contacts", headerRight: () => <AppVersionBadge /> }}
       />
       <ProfileStack.Screen
         name="Feedback"
