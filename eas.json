@@ -42,5 +42,10 @@
         "buildConfiguration": "Debug"
       }
     }
+  },
+  "submit": {
+    "production": {
+      "ios": { "ascAppId": "6788637948" }
+    }
   }
 }
