@@ -119,6 +119,7 @@ export const handleNotificationPress = (data?: NotificationData) => {
         return { screen: 'RidesTab' };
     }
 
+    if (data.type === "BOOKING_CREATED") return { screen: "HomeTab", params: { screen: "HomeDashboard" } };
     const notificationType = getNotificationType(data);
     const jobId = getNotificationBookingId(data);
 
