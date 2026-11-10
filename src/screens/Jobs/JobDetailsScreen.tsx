@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type TextInputInstance,
   View,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -135,7 +136,7 @@ export const JobDetailsScreen: React.FC<Props> = ({ route }) => {
   const [awaitingRideStartConfirmation, setAwaitingRideStartConfirmation] =
     useState(false);
   const [ackLoading, setAckLoading] = useState(false);
-  const pickupCodeInputRef = useRef<TextInput>(null);
+  const pickupCodeInputRef = useRef<TextInputInstance>(null);
 
   const canSubmitPickupCode = useMemo(() => {
     const normalized = pickupCode.trim();

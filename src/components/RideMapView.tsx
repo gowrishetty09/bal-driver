@@ -279,12 +279,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fullScreenContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.flatten(StyleSheet.absoluteFill),
     height: "100%",
     marginBottom: 0,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.flatten(StyleSheet.absoluteFill),
   },
   noMapContainer: {
     height: 150,

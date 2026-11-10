@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Text, View, type AppStateStatus } from 'react-native';
+import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 
@@ -48,7 +48,7 @@ export const ForceUpdateGate: React.FC<ForceUpdateGateProps> = ({ children }) =>
   const [updateConfig, setUpdateConfig] = useState<DriverAppUpdateConfig | null>(null);
   const isRunningCheck = useRef(false);
   const lastUpdateCheckAt = useRef(0);
-  const appState = useRef<AppStateStatus>(AppState.currentState);
+  const appState = useRef<typeof AppState.currentState>(AppState.currentState);
 
   useEffect(() => {
     let isActive = true;
@@ -116,7 +116,7 @@ export const ForceUpdateGate: React.FC<ForceUpdateGateProps> = ({ children }) =>
     };
 
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      if (appState.current?.match(/inactive|background/) && nextAppState === 'active') {
         const elapsedSinceLastCheck = Date.now() - lastUpdateCheckAt.current;
         if (elapsedSinceLastCheck >= FOREGROUND_RECHECK_THROTTLE_MS) {
           void runUpdateCheck();

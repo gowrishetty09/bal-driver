@@ -130,7 +130,7 @@ export const SupportListScreen: React.FC<Props> = ({ navigation }) => {
             />
           }
           ListEmptyComponent={
-            empty ? <Text style={styles.emptyText}>No tickets yet.</Text> : null
+            empty ? <Text style={styles.emptyText}>No tickets yet.</Text> : undefined
           }
         />
       )}

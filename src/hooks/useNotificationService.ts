@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
 import { useAuth } from './useAuth';
@@ -141,6 +141,8 @@ export const useNotificationService = () => {
      * Get Expo push token
      */
     const getExpoPushToken = async (): Promise<string | null> => {
+        // Expo Go does not contain this app's push credentials.
+        if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
         // Check if running on a physical device
         if (!Device.isDevice) {
             console.warn('Push notifications require a physical device');

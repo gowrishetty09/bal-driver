@@ -1,4 +1,5 @@
 import { RideOffersCard } from "../../components/RideOffersCard";
+import { RideReadinessCard } from "../../components/RideReadinessCard";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -187,6 +188,7 @@ export const HomeDashboardScreen: React.FC = () => {
       onRefresh={handleRefresh}
     >
       <LocationStatusBanner />
+      <RideReadinessCard />
       <RideOffersCard />
 
       {pendingAssignment ? (

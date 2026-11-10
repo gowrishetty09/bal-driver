@@ -142,7 +142,7 @@ export const ExpensesListScreen: React.FC = () => {
             <View style={styles.loadingBlock}>
               <Text style={styles.helperText}>No expenses yet.</Text>
             </View>
-          ) : null
+          ) : undefined
         }
         ListFooterComponent={<View style={{ height: 24 }} />}
         keyboardShouldPersistTaps="handled"

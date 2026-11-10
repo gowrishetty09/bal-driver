@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 
 import { loginDriver, DriverUser, logoutDriver } from '../api/driver';
-import { registerAuthHandlers, setSessionTokens } from '../api/client';
+import { apiClient, registerAuthHandlers, setSessionTokens } from '../api/client';
 import { SessionTokens, isTokenExpired } from '../types/auth';
 
 import { SESSION_KEY, getLocationSession, readLocationSession, subscribeSessionRefresh } from '../services/locationSession';
@@ -58,6 +58,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const performLogout = useCallback(
     async ({ skipRemote }: { skipRemote?: boolean } = {}) => {
       const refreshToken = state.tokens?.refreshToken;
+      if (!skipRemote && state.tokens?.accessToken) {
+        try { await apiClient.patch('/driver/ride-readiness', { ready: false }, { timeout: 5000 }); } catch { /* Server also excludes stale GPS sessions. */ }
+      }
       setSessionTokens(null);
       setState({ tokens: null, user: null });
       await clearStoredSession();

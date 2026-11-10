@@ -7,14 +7,15 @@ import { API_BASE_URL } from '../utils/config';
 import { getLocationSession } from './locationSession';
 
 export const DRIVER_BACKGROUND_LOCATION_TASK = 'bal-driver-background-location';
-const BACKGROUND_LOCATION_DISCLOSURE_KEY = 'backgroundLocationDisclosureAccepted';
+export const READY_FOR_RIDES_TRACKING = '__ready_for_rides__';
+const BACKGROUND_LOCATION_DISCLOSURE_KEY = 'backgroundLocationDisclosureAcceptedV2';
 const ACTIVE_BACKGROUND_BOOKING_ID_KEY = 'activeBackgroundLocationBookingId';
 const PENDING_KEY = 'driverPendingLocationV2';
 const STATUS_KEY = 'driverTrackingStatusV2';
 export type TrackingSample = {
   latitude: number; longitude: number; timestamp: string;
   heading?: number; speed?: number; accuracy?: number;
-  bookingId?: string; trackingOnly?: boolean;
+  bookingId?: string; trackingOnly?: boolean; availabilityOnly?: boolean;
 };
 export type TrackingStatus = {
   lastSentAt?: string; lastAcknowledgedAt?: string; sample?: TrackingSample; error?: string | null;
@@ -65,7 +66,7 @@ export async function flushPendingLocation(): Promise<void> {
     let sample = pending;
     if (!sample && raw) { try { sample = JSON.parse(raw); } catch { return; } }
     if (!sample) return;
-    if (sample.trackingOnly && await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY) !== sample.bookingId) {
+    if ((sample.trackingOnly || sample.availabilityOnly) && await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY) !== (sample.availabilityOnly ? READY_FOR_RIDES_TRACKING : sample.bookingId)) {
       pending = null; await AsyncStorage.removeItem(PENDING_KEY); return;
     }
     let session = await getLocationSession();
@@ -81,8 +82,8 @@ export async function flushPendingLocation(): Promise<void> {
       if (!session) throw new Error('Sign in again to share location.');
       response = await send(session.accessToken);
     }
-    if (response.data.trackingActive === false && sample.trackingOnly) {
-      if (await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY) === sample.bookingId) {
+    if (response.data.trackingActive === false && (sample.trackingOnly || sample.availabilityOnly)) {
+      if (await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY) === (sample.availabilityOnly ? READY_FOR_RIDES_TRACKING : sample.bookingId)) {
         await configureBackgroundTracking(null);
       }
     } else {
@@ -105,8 +106,8 @@ const confirmBackgroundLocationDisclosure = async (): Promise<boolean> => {
 
   return new Promise((resolve) => {
     Alert.alert(
-      'Background location for active rides',
-      'BAL Driver collects and shares your location during active rides, including when the app is in the background or Google Maps is open. This lets dispatch, hotel users, and admins track the assigned car until the ride is completed or cancelled.',
+      'Location while ready or on a ride',
+      'BAL Driver shares your location while Ready for rides to find nearby customer bookings, and during active rides so dispatch and customers can track the assigned car. This continues with the screen locked or navigation open. Stop availability to stop matching; tracking for an active ride continues until it ends.',
       [
         {
           text: 'Not now',
@@ -136,6 +137,7 @@ export async function requestForegroundLocationPermissionWithDisclosure(): Promi
 export async function ensureBackgroundLocationPermission(): Promise<boolean> {
   if (Platform.OS === 'web' || AppState.currentState !== 'active') return false;
   if (!await TaskManager.isAvailableAsync()) return false;
+  if (!await confirmBackgroundLocationDisclosure()) return false;
   let foreground = await requestForegroundLocationPermissionWithDisclosure();
   if (foreground.status !== 'granted') return false;
   const background = await Location.getBackgroundPermissionsAsync();
@@ -181,7 +183,7 @@ export function configureBackgroundTracking(bookingId: string | null, requestPer
         showsBackgroundLocationIndicator: true,
         foregroundService: {
           notificationTitle: 'BAL Driver live tracking',
-          notificationBody: 'Sharing location for your active ride.',
+          notificationBody: 'Sharing location while ready for rides or on an active ride.',
           notificationColor: '#151e2d', killServiceOnDestroy: false,
         },
       });
@@ -201,5 +203,5 @@ TaskManager.defineTask(DRIVER_BACKGROUND_LOCATION_TASK,
     if (!bookingId) { await configureBackgroundTracking(null); return; }
     const latest = data?.locations?.slice(-1)[0];
     if (!latest) return;
-    await publishLocation({ ...locationSample(latest), bookingId, trackingOnly: true });
+    await publishLocation({ ...locationSample(latest), ...(bookingId === READY_FOR_RIDES_TRACKING ? { availabilityOnly: true } : { bookingId, trackingOnly: true }) });
   });

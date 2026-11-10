@@ -2,33 +2,21 @@
   "expo": {
     "name": "BAL Driver",
     "slug": "bal-driver",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/AppIcons/playstore.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "jsEngine": "hermes",
-    "notification": {
-      "icon": "./assets/notifiy-icon.png",
-      "color": "#151e2d"
-    },
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
     "ios": {
       "supportsTablet": true,
-      "jsEngine": "jsc",
       "bundleIdentifier": "com.bal.driver",
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BAL Driver uses your location to show nearby and assigned rides while you use the app.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "BAL Driver uses your location during active rides so dispatch, hotels, and admins can track the assigned car even when navigation is open.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BAL Driver shares your location while Ready for rides to match nearby bookings, and during active rides so customers and dispatch can track the car, including with the screen locked or navigation open.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "runtimeVersion": "1.1.0",
+    "runtimeVersion": "1.1.1",
     "updates": {
       "enabled": true,
       "url": "https://u.expo.dev/8438fa17-4c08-44c3-ac11-2962a3c04b1b",
@@ -48,7 +36,6 @@
           "apiKey": "AIzaSyAz4YMeMa3klDCnm_HZh6IuwkqA_5t0I0w"
         }
       },
-      "edgeToEdgeEnabled": false,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -62,7 +49,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notifiy-icon.png",
+          "color": "#151e2d"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-location",
@@ -70,7 +63,7 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true,
           "isIosBackgroundLocationEnabled": true,
-          "locationAlwaysAndWhenInUsePermission": "BAL Driver uses your location during active rides so dispatch, hotels, and admins can track the assigned car even when navigation is open."
+          "locationAlwaysAndWhenInUsePermission": "BAL Driver shares your location while Ready for rides to match nearby bookings, and during active rides so customers and dispatch can track the car, including with the screen locked or navigation open."
         }
       ],
       "expo-updates",
@@ -81,7 +74,17 @@
         }
       ],
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "apiBaseUrl": "https://bestaerolimo.com/api",

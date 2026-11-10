@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Alert } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { apiClient } from '../api/client';
 import NetInfo from '@react-native-community/netinfo';
 import * as Location from 'expo-location';
 import { socketService } from '../services/socketService';
@@ -7,12 +9,17 @@ import { getDriverJobs } from '../api/driver';
 import { useAuth } from '../hooks/useAuth';
 import { subscribeJobRefresh } from '../utils/events';
 import {
-  configureBackgroundTracking, flushPendingLocation, locationSample, publishLocation,
+  configureBackgroundTracking, flushPendingLocation, locationSample, publishLocation, READY_FOR_RIDES_TRACKING, ensureBackgroundLocationPermission,
   readTrackingStatus, requestForegroundLocationPermissionWithDisclosure, subscribeTracking,
 } from '../services/backgroundLocation';
 
 export type LocationPermissionState = Location.PermissionStatus | 'undetermined';
 export type LocationContextValue = {
+  outsideDriver: boolean | null;
+  readyForRides: boolean;
+  readinessBusy: boolean;
+  readinessError: string | null;
+  setRideReadiness: (ready: boolean) => Promise<void>;
   permissionStatus: LocationPermissionState;
   isSharingLocation: boolean;
   backgroundTrackingActive: boolean;
@@ -29,6 +36,49 @@ const ACTIVE = ['PICKED_UP', 'ARRIVED', 'EN_ROUTE'];
 
 export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { isAuthenticated, isInitializing, user, token } = useAuth();
+  const [outsideDriver, setOutsideDriver] = useState<boolean | null>(null);
+  const [readyForRides, setReadyForRides] = useState(false);
+  const [readinessBusy, setReadinessBusy] = useState(false);
+  const readinessLock = useRef(false);
+  const readinessRevision = useRef(0);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated) { setOutsideDriver(null); setReadyForRides(false); return; }
+    let alive = true;
+    const refresh = async () => {
+      if (AppState.currentState !== 'active' || readinessLock.current) return;
+      const revision = readinessRevision.current;
+      try {
+        const { data } = await apiClient.get('/driver/ride-readiness');
+        if (alive && !readinessLock.current && revision === readinessRevision.current) { setOutsideDriver(data.outsideDriver); setReadyForRides(data.ready); setReadinessError(null); }
+      } catch { if (alive) setReadinessError('Ride availability could not be loaded. Check your connection and try again.'); }
+    };
+    void refresh(); const timer = setInterval(refresh, 15000);
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') void refresh(); });
+    return () => { alive = false; clearInterval(timer); listener.remove(); };
+  }, [isAuthenticated, user?.id]);
+  const setRideReadiness = useCallback(async (ready: boolean) => {
+    if (readinessLock.current) return;
+    readinessLock.current = true; readinessRevision.current++; setReadinessBusy(true); setReadinessError(null);
+    try {
+      if (ready) {
+        const permission = await requestForegroundLocationPermissionWithDisclosure();
+        setPermissionStatus(permission.status);
+        if (permission.status !== 'granted') throw new Error('Allow location access to receive nearby rides.');
+        if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
+          if (!await ensureBackgroundLocationPermission()) throw new Error('Allow background location to stay ready when the screen is locked.');
+        } else Alert.alert('Expo Go preview', 'Keep this app open for nearby rides. Background availability and push notifications need the installed driver app.');
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        if (Date.now() - position.timestamp > 120000 || (position.coords.accuracy ?? Infinity) > 200) throw new Error('Waiting for an accurate GPS position. Move outdoors and try again.');
+        await apiClient.post('/driver/location', locationSample(position));
+      }
+      const { data } = await apiClient.patch('/driver/ride-readiness', { ready });
+      setReadyForRides(data.ready); setOutsideDriver(data.outsideDriver);
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? error?.message ?? 'Unable to update ride availability.';
+      setReadinessError(typeof message === 'string' ? message : 'Unable to update ride availability.');
+    } finally { readinessLock.current = false; setReadinessBusy(false); }
+  }, []);
   const [permissionStatus, setPermissionStatus] = useState<LocationPermissionState>('undetermined');
   const [appState, setAppState] = useState(AppState.currentState);
   // Undefined means the server has not reconciled the active ride yet.
@@ -117,12 +167,13 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     if (isInitializing || activeBookingId === undefined) return;
     let cancelled = false;
     socketService.setCurrentBookingId(activeBookingId);
+    const trackingTarget = activeBookingId ?? (readyForRides ? READY_FOR_RIDES_TRACKING : null);
     const configure = async (askPermission = true) => {
       if (cancelled) return;
-      if (askPermission) setBackgroundTrackingStarting(Boolean(activeBookingId) && !backgroundRef.current);
+      if (askPermission) setBackgroundTrackingStarting(Boolean(trackingTarget) && !backgroundRef.current);
       try {
-        const active = await configureBackgroundTracking(isAuthenticated ? activeBookingId : null,
-          askPermission && Boolean(activeBookingId) && appState === 'active');
+        const active = await configureBackgroundTracking(isAuthenticated ? trackingTarget : null,
+          askPermission && Boolean(trackingTarget) && appState === 'active');
         if (cancelled) return;
         backgroundRef.current = active;
         setBackgroundTrackingActive(active);
@@ -150,7 +201,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     const timer = appState === 'active' && activeBookingId && isAuthenticated
       ? setInterval(() => { void reconcile(false); }, 5000) : undefined;
     return () => { cancelled = true; if (timer) clearInterval(timer); };
-  }, [activeBookingId, isAuthenticated, isInitializing, appState, permissionRetry]);
+  }, [activeBookingId, readyForRides, isAuthenticated, isInitializing, appState, permissionRetry]);
 
   useEffect(() => {
     if (!isAuthenticated || permissionStatus !== 'granted' || appState !== 'active') return;
@@ -192,8 +243,8 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     } catch { return null; }
   }, [permissionStatus]);
   const isSharingLocation = isAuthenticated && !trackingError && Boolean(lastAcknowledgedAt && now-Date.parse(lastAcknowledgedAt)<30000);
-  const value = useMemo(() => ({ permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,
+  const value = useMemo(() => ({ outsideDriver, readyForRides, readinessBusy, readinessError, setRideReadiness, permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,
     lastSentAt,lastKnownCoordinates,requestPermission,isHighFrequencyMode:Boolean(activeBookingId),backgroundTrackingStarting,refreshLocation }),
-    [permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,lastSentAt,lastKnownCoordinates,requestPermission,activeBookingId,backgroundTrackingStarting,refreshLocation]);
+    [outsideDriver,readyForRides,readinessBusy,readinessError,setRideReadiness,permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,lastSentAt,lastKnownCoordinates,requestPermission,activeBookingId,backgroundTrackingStarting,refreshLocation]);
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 };

@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { WS_URL } from '../utils/config';
 
@@ -12,7 +12,7 @@ class SocketService {
 
 	// Offline-safe connection guards
 	private netOnline: boolean | null = null;
-	private appState: AppStateStatus = AppState.currentState;
+	private appState: typeof AppState.currentState = AppState.currentState;
 	private netUnsub: (() => void) | null = null;
 	private appStateSub: { remove: () => void } | null = null;
 
