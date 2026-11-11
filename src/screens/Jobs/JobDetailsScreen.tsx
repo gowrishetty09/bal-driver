@@ -1,21 +1,7 @@
 import { fetchDriverRoute, type DriverRoute } from "../../services/routeDirections";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  AppState,
-  Alert,
-  Dimensions,
-  Linking,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  type TextInputInstance,
-  View,
-} from "react-native";
+import { ActivityIndicator, AppState, Alert, Dimensions, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, type TextInputInstance, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -1839,7 +1825,7 @@ const createStyles = (colors: ThemeColors) =>
     etaText: {
       fontSize: typography.caption,
       color: colors.primary,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     overlayCustomerPhone: {
       fontSize: typography.caption,
@@ -1949,7 +1935,7 @@ const createStyles = (colors: ThemeColors) =>
     navigateOverlayButtonText: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     overlayStatusBadge: {
       backgroundColor: colors.background,
@@ -1962,7 +1948,7 @@ const createStyles = (colors: ThemeColors) =>
     overlayStatusText: {
       fontSize: typography.caption,
       color: colors.text,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     overlayCustomerRow: {
       flexDirection: "row",
@@ -1978,7 +1964,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     overlayCustomerName: {
       fontSize: typography.subheading,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.text,
     },
     overlayCallButton: {
@@ -2014,7 +2000,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     overlayPaymentValue: {
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.text,
     },
     overlayPaymentPaid: {
@@ -2031,7 +2017,7 @@ const createStyles = (colors: ThemeColors) =>
     navigateButtonText: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     overlayActionsContainer: {
       flexDirection: "column",
@@ -2047,7 +2033,7 @@ const createStyles = (colors: ThemeColors) =>
     overlayPrimaryActionLabel: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     overlayPrimaryActionLabelDisabled: {
       color: colors.text,
@@ -2064,7 +2050,7 @@ const createStyles = (colors: ThemeColors) =>
     overlayCancelActionLabel: {
       color: colors.danger,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     overlaySecondaryActions: {
       flexDirection: "row",
@@ -2082,7 +2068,7 @@ const createStyles = (colors: ThemeColors) =>
     overlayNoShowActionLabel: {
       color: "#fa541c",
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     loaderContainer: {
       flex: 1,
@@ -2107,7 +2093,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     jobId: {
       fontSize: typography.heading,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
       color: colors.text,
     },
     subtle: {
@@ -2164,7 +2150,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     customerName: {
       fontSize: typography.subheading,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.muted,
     },
     customerContact: {
@@ -2217,7 +2203,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     distanceTimeValue: {
       fontSize: typography.heading,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
       color: colors.primary,
     },
     distanceTimeLabel: {
@@ -2231,7 +2217,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     metaValue: {
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.brandNavy,
     },
     notes: {
@@ -2265,7 +2251,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     timelineStatusActive: {
       color: colors.text,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     primaryAction: {
       backgroundColor: colors.primary,
@@ -2281,7 +2267,7 @@ const createStyles = (colors: ThemeColors) =>
     primaryActionLabel: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     inProgressWarning: {
       backgroundColor: "#FFF3E0",
@@ -2308,7 +2294,7 @@ const createStyles = (colors: ThemeColors) =>
     secondaryActionLabel: {
       color: colors.danger,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     secondaryActionNoShow: {
       alignItems: "center",
@@ -2317,7 +2303,7 @@ const createStyles = (colors: ThemeColors) =>
     secondaryActionNoShowLabel: {
       color: "#fa541c",
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     modalBackdrop: {
       flex: 1,
@@ -2383,12 +2369,12 @@ const createStyles = (colors: ThemeColors) =>
     },
     pickupCodeTitle: {
       fontSize: 20,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.text,
       marginBottom: 6,
     },
     pickupCodeSubtitle: {
-      fontSize: 14,
+      fontSize: 16,
       fontFamily: typography.fontFamilyRegular,
       color: colors.textSecondary,
       textAlign: "center",
@@ -2400,8 +2386,8 @@ const createStyles = (colors: ThemeColors) =>
       marginTop: 8,
     },
     pickupCodeSuccessText: {
-      fontSize: 14,
-      fontFamily: typography.fontFamilyMedium,
+      fontSize: 16,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: "#52c41a",
     },
     pickupCodeDigitsContainer: {
@@ -2428,7 +2414,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     pickupCodeDigitText: {
       fontSize: 22,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.text,
     },
     pickupCodeHiddenInput: {
@@ -2455,8 +2441,8 @@ const createStyles = (colors: ThemeColors) =>
       paddingVertical: 14,
     },
     pickupCodeCancelText: {
-      fontSize: 15,
-      fontFamily: typography.fontFamilyMedium,
+      fontSize: 16,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.textSecondary,
     },
     pickupCodeVerifyBtn: {

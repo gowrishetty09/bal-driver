@@ -1,14 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { Screen } from "../../components/Screen";
@@ -237,7 +229,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   filterText: {
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
   },
   filterTextSelected: {
@@ -254,7 +246,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 36,
+    minHeight: 52,
+    fontSize: typography.body,
     borderRadius: 8,
     borderWidth: 0,
     borderColor: colors.border,
@@ -264,8 +257,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   clearButton: {
     marginLeft: 8,
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -273,7 +266,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   clearButtonText: {
     color: colors.muted,
-    fontSize: 16,
+    fontSize: 18,
   },
   card: {
     backgroundColor: colors.card,
@@ -310,13 +303,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.cardSecondary,
   },
   statusText: {
-    fontSize: 10,
+    fontSize: 14,
     color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   jobRef: {
     fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.text,
   },
   subtle: {
@@ -343,9 +336,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderTopColor: colors.border,
   },
   time: {
-    fontSize: 10,
+    fontSize: 14,
     color: colors.highlight,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   tapHint: {
     fontSize: typography.caption,

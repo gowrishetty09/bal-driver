@@ -1,13 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -307,7 +300,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   title: {
     fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.text,
     textAlign: 'center',
   },
@@ -322,7 +315,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   label: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
     marginBottom: 12,
   },
@@ -339,7 +332,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 8,
     fontSize: typography.body,
     color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -364,7 +357,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   categoryLabelSelected: {
     color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   categoryDescription: {
     marginTop: 8,
@@ -409,7 +402,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   submitLabel: {
     color: colors.brandGold,
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   submitLabelDisabled: {
     color: colors.muted,
@@ -425,7 +418,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   successTitle: {
     fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.text,
     marginBottom: 12,
   },
@@ -433,7 +426,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: typography.body,
     color: colors.muted,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 28,
   },
   doneButton: {
     marginTop: 32,
@@ -445,7 +438,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   doneButtonLabel: {
     color: colors.brandGold,
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   tipsContainer: {
     marginTop: 24,
@@ -455,13 +448,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   tipsTitle: {
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
     marginBottom: 8,
   },
   tipText: {
     fontSize: typography.caption,
     color: colors.muted,
-    lineHeight: 20,
+    lineHeight: 24,
   },
 });

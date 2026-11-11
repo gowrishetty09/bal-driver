@@ -13,14 +13,14 @@ function load(relative,mocks,clock){
     {exports,require:id=>{if(!(id in mocks))throw Error('Unexpected dependency: '+id);return mocks[id]},Date:clock??Date,console:{warn(){}},setTimeout,clearTimeout,AbortController});
   return exports;
 }
-function setup(){
+function setup(environment='standalone'){
   const storage=new Map();let handler;let started=false;let starts=0;let stops=0;let now=Date.now();let response={data:{trackingActive:true}};
   const calls=[];
   const store={getItem:async key=>storage.get(key)??null,setItem:async(key,value)=>storage.set(key,value),removeItem:async key=>storage.delete(key)};
   const location={getForegroundPermissionsAsync:async()=>({status:'granted'}),requestForegroundPermissionsAsync:async()=>{throw Error('Must not reopen granted permission');},Accuracy:{High:4},ActivityType:{AutomotiveNavigation:1},getBackgroundPermissionsAsync:async()=>({status:'granted'}),hasStartedLocationUpdatesAsync:async()=>started,startLocationUpdatesAsync:async(name,options)=>{starts++;started=true;assert.equal(options.foregroundService.killServiceOnDestroy,false)},stopLocationUpdatesAsync:async()=>{stops++;started=false}};
   const axios={post:async(...args)=>{calls.push(args);if(response instanceof Error)throw response;return typeof response==='function'?response():response},isAxiosError:e=>e?.isAxiosError===true};
   class Clock extends Date {static now(){return now}}
-  const api=load('src/services/backgroundLocation.ts',{'axios':axios,'@react-native-async-storage/async-storage':store,'expo-location':location,'expo-task-manager':{defineTask:(name,fn)=>handler=fn,isAvailableAsync:async()=>true},'react-native':{AppState:{currentState:'active'},Platform:{OS:'android'},Alert:{alert(){}},Linking:{openSettings:async()=>{}}},'../utils/config':{API_BASE_URL:'https://backend.test'},'./locationSession':{getLocationSession:async()=>({accessToken:'token'})}},Clock);
+  const api=load('src/services/backgroundLocation.ts',{'expo-constants':{__esModule:true,default:{executionEnvironment:environment},ExecutionEnvironment:{StoreClient:'storeClient'}},'axios':axios,'@react-native-async-storage/async-storage':store,'expo-location':location,'expo-task-manager':{defineTask:(name,fn)=>handler=fn,isAvailableAsync:async()=>true},'react-native':{AppState:{currentState:'active'},Platform:{OS:'android'},Alert:{alert(){}},Linking:{openSettings:async()=>{}}},'../utils/config':{API_BASE_URL:'https://backend.test'},'./locationSession':{getLocationSession:async()=>({accessToken:'token'})}},Clock);
   return {api,storage,calls,location,task:data=>handler({data}),tick:()=>now+=5000,setResponse:value=>response=value,counts:()=>({starts,stops,started})};
 }
 const fix=(timestamp=Date.now())=>({coords:{latitude:3,longitude:101,heading:45,speed:5,accuracy:8},timestamp});
@@ -77,7 +77,7 @@ test('passive reconciliation recovers after background permission is granted in 
 });
 
 test('already granted permissions never reopen Android permission activity on resume',async()=>{
- const h=setup();h.location.getForegroundPermissionsAsync=async()=>({status:'granted'});
+ const h=setup();h.storage.set('backgroundLocationDisclosureAcceptedV2','true');h.location.getForegroundPermissionsAsync=async()=>({status:'granted'});
  h.location.requestForegroundPermissionsAsync=async()=>{throw Error('Must not reopen granted permission');};
  assert.equal(await h.api.configureBackgroundTracking('ride-1',true),true);
  assert.equal(await h.api.configureBackgroundTracking('ride-1',true),true);
@@ -98,4 +98,15 @@ test('successful upload records receipt time separately from the GPS capture tim
  assert.equal(status.lastSentAt,new Date(captured).toISOString());
  assert.ok(Date.parse(status.lastAcknowledgedAt)>captured+50000);
  assert.equal(status.error,null);
+});
+
+test('Expo Go never starts native background work or sends foreground preview locations',async()=>{
+ const h=setup('storeClient');
+ for(const name of ['getBackgroundPermissionsAsync','hasStartedLocationUpdatesAsync','startLocationUpdatesAsync','stopLocationUpdatesAsync']) h.location[name]=async()=>{throw Error('Unsupported background API called')};
+ assert.equal(await h.api.configureBackgroundTracking('ride-1',true),false);
+ assert.equal(await h.api.configureBackgroundTracking('ride-1',false),false);
+ assert.equal(await h.api.configureBackgroundTracking(null),false);
+ await h.api.publishLocation(h.api.locationSample(fix()));
+ await h.api.flushPendingLocation();
+ assert.equal(h.calls.length,0);
 });

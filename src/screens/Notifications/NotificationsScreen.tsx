@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
@@ -148,18 +149,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
     color: colors.text,
     marginBottom: 4,
   },
   body: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.textSecondary,
     marginBottom: 6,
   },
   meta: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textMuted,
   },
   dot: {

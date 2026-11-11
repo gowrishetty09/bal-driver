@@ -1,13 +1,6 @@
 import React, { useCallback } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -154,7 +147,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   heading: {
     fontSize: typography.heading,
     color: colors.text,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
   },
   feedbackButton: {
     backgroundColor: colors.brandNavy,
@@ -174,7 +167,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   newTicketLabel: {
     color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   loaderContainer: {
     flex: 1,
@@ -210,7 +203,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   subject: {
     fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
     flex: 1,
     paddingRight: 12,
@@ -223,7 +216,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   statusLabel: {
     color: colors.textInverse,
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   metaText: {
     marginTop: 8,

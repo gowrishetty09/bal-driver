@@ -1,15 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -143,14 +134,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     heroTitle: {
         color: '#fff',
         fontSize: 26,
-        fontFamily: typography.fontFamilyBold,
+        fontWeight: '700', fontFamily: typography.fontFamilyBold,
         marginBottom: 12,
         lineHeight: 32,
     },
     heroSubtitle: {
         color: '#E7ECFF',
         fontSize: typography.body,
-        lineHeight: 22,
+        lineHeight: 26,
     },
     card: {
         backgroundColor: colors.card,
@@ -168,7 +159,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     cardTitle: {
         fontSize: typography.subheading,
-        fontFamily: typography.fontFamilyBold,
+        fontWeight: '700', fontFamily: typography.fontFamilyBold,
         color: colors.text,
     },
     cardSubtitle: {
@@ -206,7 +197,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     primaryButtonLabel: {
         color: colors.brandNavy,
         fontSize: typography.subheading,
-        fontFamily: typography.fontFamilyMedium,
+        fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     secondaryAction: {
         alignItems: 'center',

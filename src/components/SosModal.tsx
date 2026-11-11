@@ -1,16 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  Modal,
-  PermissionsAndroid,
-  Platform,
-  Pressable,
-  Share,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Linking, Modal, PermissionsAndroid, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { AppText as Text } from './AppText';
 
 import { DriverJob, getDriverJobs } from '../api/driver';
 import { logSosEvent, resolveCurrentLocation, SosKind } from '../api/sos';
@@ -273,7 +263,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   title: {
     fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.brandNavy,
   },
   subtitle: {
@@ -297,7 +287,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   tripContextValue: {
     fontSize: typography.body,
     color: colors.brandNavy,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   tripContextValueMuted: {
     fontSize: typography.body,
@@ -320,7 +310,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   optionLabel: {
     fontSize: typography.subheading,
     color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   optionDescription: {
     marginTop: 4,
@@ -341,6 +331,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   closeLabel: {
     color: colors.textInverse,
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
 });

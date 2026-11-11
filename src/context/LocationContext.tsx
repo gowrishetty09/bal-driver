@@ -1,6 +1,5 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Alert } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { AppState } from 'react-native';
 import { apiClient } from '../api/client';
 import NetInfo from '@react-native-community/netinfo';
 import * as Location from 'expo-location';
@@ -10,7 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { subscribeJobRefresh } from '../utils/events';
 import {
   configureBackgroundTracking, flushPendingLocation, locationSample, publishLocation, READY_FOR_RIDES_TRACKING, ensureBackgroundLocationPermission,
-  readTrackingStatus, requestForegroundLocationPermissionWithDisclosure, subscribeTracking,
+  readTrackingStatus, requestForegroundLocationPermissionWithDisclosure, subscribeTracking, supportsBackgroundLocation,
 } from '../services/backgroundLocation';
 
 export type LocationPermissionState = Location.PermissionStatus | 'undetermined';
@@ -62,12 +61,11 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     readinessLock.current = true; readinessRevision.current++; setReadinessBusy(true); setReadinessError(null);
     try {
       if (ready) {
+        if (!supportsBackgroundLocation) throw new Error('Install the driver development or TestFlight build to go ready for rides. Expo Go tracking is disabled.');
         const permission = await requestForegroundLocationPermissionWithDisclosure();
         setPermissionStatus(permission.status);
         if (permission.status !== 'granted') throw new Error('Allow location access to receive nearby rides.');
-        if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
-          if (!await ensureBackgroundLocationPermission()) throw new Error('Allow background location to stay ready when the screen is locked.');
-        } else Alert.alert('Expo Go preview', 'Keep this app open for nearby rides. Background availability and push notifications need the installed driver app.');
+        if (!await ensureBackgroundLocationPermission()) throw new Error('Allow background location to stay ready when the screen is locked.');
         const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         if (Date.now() - position.timestamp > 120000 || (position.coords.accuracy ?? Infinity) > 200) throw new Error('Waiting for an accurate GPS position. Move outdoors and try again.');
         await apiClient.post('/driver/location', locationSample(position));
@@ -170,14 +168,14 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     const trackingTarget = activeBookingId ?? (readyForRides ? READY_FOR_RIDES_TRACKING : null);
     const configure = async (askPermission = true) => {
       if (cancelled) return;
-      if (askPermission) setBackgroundTrackingStarting(Boolean(trackingTarget) && !backgroundRef.current);
+      if (askPermission) setBackgroundTrackingStarting(supportsBackgroundLocation && Boolean(trackingTarget) && !backgroundRef.current);
       try {
         const active = await configureBackgroundTracking(isAuthenticated ? trackingTarget : null,
           askPermission && Boolean(trackingTarget) && appState === 'active');
         if (cancelled) return;
         backgroundRef.current = active;
         setBackgroundTrackingActive(active);
-        if (activeBookingId && !active) setTrackingError('Background tracking is not enabled. Allow location all the time in Settings.');
+        if (supportsBackgroundLocation && activeBookingId && !active) setTrackingError('Background tracking is not enabled. Allow location all the time in Settings.');
         else setTrackingError(previous => previous?.startsWith('Background tracking') || previous?.startsWith('Allow location') ? null : previous);
         const foreground = await Location.getForegroundPermissionsAsync();
         if (!cancelled) setPermissionStatus(foreground.status);
@@ -204,7 +202,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
   }, [activeBookingId, readyForRides, isAuthenticated, isInitializing, appState, permissionRetry]);
 
   useEffect(() => {
-    if (!isAuthenticated || permissionStatus !== 'granted' || appState !== 'active') return;
+    if (!supportsBackgroundLocation || !isAuthenticated || permissionStatus !== 'granted' || appState !== 'active') return;
     let cancelled = false;
     let watcher: Location.LocationSubscription | undefined;
     let lastUpload = 0;
@@ -242,7 +240,7 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
       setLastKnownCoordinates(coords); return coords;
     } catch { return null; }
   }, [permissionStatus]);
-  const isSharingLocation = isAuthenticated && !trackingError && Boolean(lastAcknowledgedAt && now-Date.parse(lastAcknowledgedAt)<30000);
+  const isSharingLocation = supportsBackgroundLocation && isAuthenticated && !trackingError && Boolean(lastAcknowledgedAt && now-Date.parse(lastAcknowledgedAt)<30000);
   const value = useMemo(() => ({ outsideDriver, readyForRides, readinessBusy, readinessError, setRideReadiness, permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,
     lastSentAt,lastKnownCoordinates,requestPermission,isHighFrequencyMode:Boolean(activeBookingId),backgroundTrackingStarting,refreshLocation }),
     [outsideDriver,readyForRides,readinessBusy,readinessError,setRideReadiness,permissionStatus,isSharingLocation,backgroundTrackingActive,trackingError,lastSentAt,lastKnownCoordinates,requestPermission,activeBookingId,backgroundTrackingStarting,refreshLocation]);

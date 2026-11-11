@@ -1,13 +1,7 @@
 import React, { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import Constants from 'expo-constants';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -404,6 +398,13 @@ export const DriverProfileScreen: React.FC = () => {
       </View>
 
       {/* Edit Profile Modal */}
+      <Pressable accessibilityRole="button" onPress={() => navigation.navigate('DeleteAccount')}
+        style={{ padding: 16, marginTop: 18, borderWidth: 1, borderColor: colors.border, borderRadius: 14, alignItems: 'center' }}>
+        <Text style={{ color: colors.error, fontSize: 18, fontWeight: '600' }}>Delete account</Text>
+      </Pressable>
+      <Text style={{ textAlign: 'center', color: colors.textSecondary, fontSize: 14, marginVertical: 20 }}>
+        BAL Driver · Version {Constants.expoConfig?.version ?? '—'}
+      </Text>
       <Modal
         visible={showEditModal}
         animationType="slide"
@@ -618,7 +619,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     },
     title: {
       fontSize: typography.heading,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
       color: colors.text,
     },
     subtitle: {
@@ -648,7 +649,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     },
     editButtonText: {
       color: colors.primary,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     badge: {
       paddingHorizontal: 10,
@@ -692,14 +693,14 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     },
     statusButtonText: {
       color: colors.muted,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     statusButtonTextActive: {
       color: colors.textInverse,
     },
     sectionTitle: {
       fontSize: typography.subheading,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
       color: colors.text,
     },
     sectionSubtitle: {
@@ -723,7 +724,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     secondaryButtonLabel: {
       color: colors.primary,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     disabledButton: {
       opacity: 0.5,
@@ -738,7 +739,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     logoutLabel: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     feedbackButton: {
       flexDirection: "row",
@@ -754,7 +755,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
       flex: 1,
       color: colors.brandGold,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     reportIssueLabel: {
       color: colors.textInverse,
@@ -778,7 +779,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     },
     modalTitle: {
       fontSize: typography.heading,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
       color: colors.text,
       marginBottom: 20,
       textAlign: "center",
@@ -810,7 +811,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     modalCancelText: {
       color: colors.muted,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     modalSubmitButton: {
       flex: 1,
@@ -822,6 +823,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>["colors"]) =>
     modalSubmitText: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
   });

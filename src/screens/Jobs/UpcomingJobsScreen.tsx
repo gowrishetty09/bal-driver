@@ -1,13 +1,6 @@
 import React, { useCallback } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -133,7 +126,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   value: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
   },
   loaderContainer: {

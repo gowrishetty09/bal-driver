@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme, ThemeColors } from '../context/ThemeContext';
@@ -227,7 +218,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   title: {
     fontSize: typography.heading,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.text,
     textAlign: 'center',
   },
@@ -243,7 +234,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   upcomingTitle: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
     marginBottom: 12,
   },
@@ -278,12 +269,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   rideReference: {
     fontSize: typography.caption,
     color: colors.brandNavy,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   ridePassenger: {
     fontSize: typography.body,
     color: colors.text,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     marginTop: 2,
   },
   rideTime: {
@@ -317,7 +308,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   okayLabel: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.brandGold,
   },
 });

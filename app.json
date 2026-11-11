@@ -2,7 +2,7 @@
   "expo": {
     "name": "BAL Driver",
     "slug": "bal-driver",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "orientation": "portrait",
     "icon": "./assets/AppIcons/playstore.png",
     "userInterfaceStyle": "light",
@@ -16,7 +16,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "runtimeVersion": "1.1.1",
+    "runtimeVersion": "1.1.2",
     "updates": {
       "enabled": true,
       "url": "https://u.expo.dev/8438fa17-4c08-44c3-ac11-2962a3c04b1b",

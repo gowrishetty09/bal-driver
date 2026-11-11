@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
@@ -163,7 +154,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   subject: {
     fontSize: typography.heading,
     color: colors.text,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
   },
   statusPill: {
     alignSelf: 'flex-start',
@@ -213,7 +204,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   messageAuthor: {
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   messageBody: {
     marginTop: 4,
@@ -251,6 +242,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   sendLabel: {
     color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
 });

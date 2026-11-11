@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { configureBackgroundTracking } from '../services/backgroundLocation';
+import { socketService } from '../services/socketService';
 
 import { loginDriver, DriverUser, logoutDriver } from '../api/driver';
 import { apiClient, registerAuthHandlers, setSessionTokens } from '../api/client';
@@ -23,6 +25,7 @@ export type AuthContextValue = {
   isInitializing: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   updateUserProfile: (updater: (prev: DriverUser | null) => DriverUser | null) => Promise<void>;
 };
 
@@ -208,6 +211,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     await performLogout();
   }, [performLogout]);
 
+  const deleteAccount = useCallback(async (password: string) => {
+    await apiClient.post('/auth/driver/delete-account', { password, confirmation: 'DELETE' }, { timeout: 45000 });
+    socketService.disconnect();
+    try { await configureBackgroundTracking(null); }
+    finally { await performLogout({ skipRemote: true }); }
+  }, [performLogout]);
+
   const updateUserProfile = useCallback(async (updater: (prev: DriverUser | null) => DriverUser | null) => {
     let nextUser: DriverUser | null = null;
     setState((prev) => {
@@ -231,9 +241,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       isInitializing,
       login,
       logout,
+      deleteAccount,
       updateUserProfile,
     }),
-    [state, isInitializing, login, logout, updateUserProfile]
+    [state, isInitializing, login, logout, deleteAccount, updateUserProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

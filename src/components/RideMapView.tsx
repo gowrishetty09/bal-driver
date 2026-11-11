@@ -1,11 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { StyleSheet, View, Platform, ScrollView } from 'react-native';
+import { AppText as Text } from './AppText';
 import MapView, {
   Marker,
   Polyline,
@@ -293,7 +288,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   noMapText: {
-    fontSize: 14,
+    fontSize: 16,
   },
   driverMarker: {
     alignItems: "center",
@@ -323,7 +318,7 @@ const styles = StyleSheet.create({
   },
   markerText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
   },
   markerPin: {
@@ -349,11 +344,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   etaIcon: {
-    fontSize: 14,
+    fontSize: 16,
     marginRight: 6,
   },
   etaText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "500",
   },
 });

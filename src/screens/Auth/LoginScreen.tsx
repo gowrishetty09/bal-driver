@@ -1,17 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StatusBar, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -182,12 +171,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   welcomeText: {
     fontSize: 28,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: '#151e2d',
     marginBottom: 8,
   },
   subtitleText: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.muted,
     fontFamily: typography.fontFamilyRegular,
   },
@@ -198,10 +187,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#151e2d',
     marginBottom: 8,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -218,7 +207,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   input: {
     flex: 1,
     paddingVertical: 14,
-    fontSize: 16,
+    fontSize: 18,
     color: '#333333',
     fontFamily: typography.fontFamilyRegular,
   },
@@ -228,8 +217,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   forgotPassword: {
     color: colors.primary,
-    fontSize: 14,
-    fontFamily: typography.fontFamilyMedium,
+    fontSize: 16,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   loginButton: {
     width: '100%',
@@ -253,8 +242,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   loginButtonLabel: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: typography.fontFamilyBold,
+    fontSize: 18,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     letterSpacing: 0.5,
   },
   footer: {
@@ -262,7 +251,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 40,
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.muted,
     fontFamily: typography.fontFamilyRegular,
   },

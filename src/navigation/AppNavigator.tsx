@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import Constants from "expo-constants";
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '../components/AppText';
 import { NavigationContainer, useNavigation, DefaultTheme, Theme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { type NativeStackHeaderProps, createNativeStackNavigator } from "@react-navigation/native-stack";
 import { enableScreens } from "react-native-screens";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +21,7 @@ import { JobDetailsScreen } from "../screens/Jobs/JobDetailsScreen";
 import { AddExpenseScreen } from "../screens/Expenses/ExpensesScreen";
 import { ExpensesListScreen } from "../screens/Expenses/ExpensesListScreen";
 import { DriverProfileScreen } from "../screens/Profile/DriverProfileScreen";
+import { DeleteAccountScreen } from '../screens/Profile/DeleteAccountScreen';
 import { ComplianceScreen } from "../screens/Profile/ComplianceScreen";
 import { EmergencyContactsScreen } from "../screens/Profile/EmergencyContactsScreen";
 import { SupportListScreen } from "../screens/Support/SupportListScreen";
@@ -33,7 +34,6 @@ import { useNotificationContext } from "../context/NotificationContext";
 import { NotificationsScreen } from "../screens/Notifications/NotificationsScreen";
 import {
   AuthStackParamList,
-  FeedbackStackParamList,
   ExpensesStackParamList,
   HomeStackParamList,
   MainTabParamList,
@@ -54,49 +54,6 @@ const Tabs = createBottomTabNavigator<MainTabParamList>();
 
 const headerLogo = require("../../assets/horizantal-logo.png");
 
-const _appVersion: string =
-  String((Constants as any).expoConfig?.version ?? (Constants as any).manifest?.version ?? "").trim();
-
-const AppVersionBadge = () =>
-  _appVersion ? (
-    <Text style={styles.appVersion}>v{_appVersion}</Text>
-  ) : null;
-
-const HeaderLogo = () => (
-  <Image
-    source={headerLogo}
-    style={styles.headerLogo}
-    accessibilityRole="image"
-    accessibilityLabel="LIM Driver logo"
-  />
-);
-
-const HeaderSignOutButton: React.FC<{ onPress: () => void; iconColor: string }> = ({
-  onPress,
-  iconColor,
-}) => (
-  <Pressable onPress={onPress} hitSlop={8} style={styles.headerIconButton}>
-    <Ionicons name="log-out-outline" size={20} color={iconColor} />
-  </Pressable>
-);
-
-const HeaderActions: React.FC<{ onLogout: () => void; onNotifications?: () => void; iconColor: string }> = ({
-  onLogout,
-  onNotifications,
-  iconColor,
-}) => (
-  <View style={styles.headerActions}>
-    <AppVersionBadge />
-    {onNotifications ? (
-      <Pressable onPress={onNotifications} hitSlop={8} style={styles.headerIconButton}>
-        <Ionicons name="notifications-outline" size={20} color={iconColor} />
-      </Pressable>
-    ) : null}
-    <SosButton />
-    <HeaderSignOutButton onPress={onLogout} iconColor={iconColor} />
-  </View>
-);
-
 const AuthStackNavigator = () => (
   <AuthStack.Navigator screenOptions={{ headerShown: false }}>
     <AuthStack.Screen name="Login" component={LoginScreen} />
@@ -115,209 +72,79 @@ const AuthStackNavigator = () => (
   </AuthStack.Navigator>
 );
 
-const HomeStackNavigator = () => {
-  const { logout } = useAuth();
-  const { colors } = useTheme();
-
-  const stackScreenOptions = {
-    headerStyle: { backgroundColor: colors.headerBackground },
-    headerTitle: () => <HeaderLogo />,
-    headerTitleAlign: "center" as const,
-    headerTintColor: colors.headerIcon,
-    headerShadowVisible: false,
+// One header for every signed-in screen; the stack owns the back action.
+const DriverHeader = ({ navigation, route, options, back }: NativeStackHeaderProps) => {
+  const insets = useSafeAreaInsets();
+  const openNotifications = () => {
+    if (route.name === 'Notifications') return;
+    navigation.getParent()?.navigate('HomeTab', { screen: 'Notifications', initial: false });
   };
-
   return (
-    <HomeStack.Navigator screenOptions={stackScreenOptions}>
-      <HomeStack.Screen
-        name="HomeDashboard"
-        component={HomeDashboardScreen}
-        options={({ navigation }) => ({
-          title: "Home",
-          headerRight: () => (
-            <HeaderActions
-              onLogout={logout}
-              onNotifications={() => navigation.navigate("Notifications")}
-              iconColor={colors.headerIcon}
-            />
-          ),
-        })}
-      />
-      <HomeStack.Screen
-        name="Notifications"
-        component={NotificationsScreen}
-        options={{ title: "Notifications", headerRight: () => <AppVersionBadge /> }}
-      />
-    </HomeStack.Navigator>
+    <View style={{ paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right, backgroundColor: '#151e2d' }}>
+      <View style={styles.headerRow}>
+        <Image source={headerLogo} style={styles.headerLogo} accessibilityLabel="BAL Driver" />
+        <View style={styles.headerActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Notifications" onPress={openNotifications} style={styles.headerIconButton}>
+            <Ionicons name="notifications-outline" size={23} color="#E5C58E" />
+          </Pressable>
+          <SosButton />
+        </View>
+      </View>
+      {back ? <View style={styles.detailRow}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.headerIconButton}>
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </Pressable>
+        <Text accessibilityRole="header" style={styles.detailTitle}>{options.title ?? route.name}</Text>
+      </View> : null}
+    </View>
   );
 };
 
-const RidesStackNavigator = () => {
-  const { logout } = useAuth();
-  const { colors } = useTheme();
-
-  const stackScreenOptions = {
-    headerStyle: { backgroundColor: colors.headerBackground },
-    headerTitle: () => <HeaderLogo />,
-    headerTitleAlign: "center" as const,
-    headerTintColor: colors.headerIcon,
-    headerShadowVisible: false,
-  };
-
-  return (
-    <RidesStack.Navigator screenOptions={stackScreenOptions}>
-      <RidesStack.Screen
-        name="Rides"
-        component={RidesScreen}
-        options={{
-          title: "Rides",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <RidesStack.Screen
-        name="JobDetails"
-        component={JobDetailsScreen}
-        options={{ title: "Job Details", headerRight: () => <AppVersionBadge /> }}
-      />
-    </RidesStack.Navigator>
-  );
+const driverStackOptions = {
+  header: (props: NativeStackHeaderProps) => <DriverHeader {...props} />,
+  headerShadowVisible: false,
 };
 
-const ExpensesStackNavigator = () => {
-  const { logout } = useAuth();
-  const { colors } = useTheme();
+const HomeStackNavigator = () => (
+  <HomeStack.Navigator screenOptions={driverStackOptions}>
+    <HomeStack.Screen name="HomeDashboard" component={HomeDashboardScreen} options={{ title: 'Home' }} />
+    <HomeStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+  </HomeStack.Navigator>
+);
 
-  const stackScreenOptions = {
-    headerStyle: { backgroundColor: colors.headerBackground },
-    headerTitle: () => <HeaderLogo />,
-    headerTitleAlign: "center" as const,
-    headerTintColor: colors.headerIcon,
-    headerShadowVisible: false,
-  };
+const RidesStackNavigator = () => (
+  <RidesStack.Navigator screenOptions={driverStackOptions}>
+    <RidesStack.Screen name="Rides" component={RidesScreen} options={{ title: 'Rides' }} />
+    <RidesStack.Screen name="JobDetails" component={JobDetailsScreen} options={{ title: 'Job details' }} />
+  </RidesStack.Navigator>
+);
 
-  return (
-    <ExpensesStack.Navigator screenOptions={stackScreenOptions}>
-      <ExpensesStack.Screen
-        name="ExpensesList"
-        component={ExpensesListScreen}
-        options={{
-          title: "Expenses",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <ExpensesStack.Screen
-        name="AddExpense"
-        component={AddExpenseScreen}
-        options={{
-          title: "Add Expense",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-    </ExpensesStack.Navigator>
-  );
-};
+const ExpensesStackNavigator = () => (
+  <ExpensesStack.Navigator screenOptions={driverStackOptions}>
+    <ExpensesStack.Screen name="ExpensesList" component={ExpensesListScreen} options={{ title: 'Expenses' }} />
+    <ExpensesStack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'Add expense' }} />
+  </ExpensesStack.Navigator>
+);
 
-const ProfileStackNavigator = () => {
-  const { logout } = useAuth();
-  const { colors } = useTheme();
+const ProfileStackNavigator = () => (
+  <ProfileStack.Navigator screenOptions={driverStackOptions}>
+    <ProfileStack.Screen name="DriverProfile" component={DriverProfileScreen} options={{ title: 'Profile' }} />
+    <ProfileStack.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ title: 'Delete account' }} />
+    <ProfileStack.Screen name="Compliance" component={ComplianceScreen} options={{ title: 'Compliance' }} />
+    <ProfileStack.Screen name="EmergencyContacts" component={EmergencyContactsScreen} options={{ title: 'Emergency contacts' }} />
+    <ProfileStack.Screen name="Feedback" component={FeedbackScreen} options={{ title: 'Share feedback' }} />
+  </ProfileStack.Navigator>
+);
 
-  const stackScreenOptions = {
-    headerStyle: { backgroundColor: colors.headerBackground },
-    headerTitle: () => <HeaderLogo />,
-    headerTitleAlign: "center" as const,
-    headerTintColor: colors.headerIcon,
-    headerShadowVisible: false,
-  };
-
-  return (
-    <ProfileStack.Navigator screenOptions={stackScreenOptions}>
-      <ProfileStack.Screen
-        name="DriverProfile"
-        component={DriverProfileScreen}
-        options={{
-          title: "Profile",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <ProfileStack.Screen
-        name="Compliance"
-        component={ComplianceScreen}
-        options={{ title: "Compliance", headerRight: () => <AppVersionBadge /> }}
-      />
-      <ProfileStack.Screen
-        name="EmergencyContacts"
-        component={EmergencyContactsScreen}
-        options={{ title: "Emergency Contacts", headerRight: () => <AppVersionBadge /> }}
-      />
-      <ProfileStack.Screen
-        name="Feedback"
-        component={FeedbackScreen}
-        options={{
-          title: "Share Feedback",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-    </ProfileStack.Navigator>
-  );
-};
-
-const SupportStackNavigator = () => {
-  const { logout } = useAuth();
-  const { colors } = useTheme();
-
-  const stackScreenOptions = {
-    headerStyle: { backgroundColor: colors.headerBackground },
-    headerTitle: () => <HeaderLogo />,
-    headerTitleAlign: "center" as const,
-    headerTintColor: colors.headerIcon,
-    headerShadowVisible: false,
-  };
-
-  return (
-    <SupportStack.Navigator screenOptions={stackScreenOptions}>
-      <SupportStack.Screen
-        name="SupportTickets"
-        component={SupportListScreen}
-        options={{
-          title: "Support",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <SupportStack.Screen
-        name="SupportTicketDetails"
-        component={SupportTicketDetailsScreen}
-        options={{
-          title: "Ticket details",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <SupportStack.Screen
-        name="NewSupportTicket"
-        component={SupportNewTicketScreen}
-        options={{
-          title: "New ticket",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <SupportStack.Screen
-        name="Feedback"
-        component={FeedbackScreen}
-        options={{
-          title: "Share Feedback",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-      <SupportStack.Screen
-        name="Help"
-        component={HelpScreen}
-        options={{
-          title: "Help Center",
-          headerRight: () => <HeaderActions onLogout={logout} iconColor={colors.headerIcon} />,
-        }}
-      />
-    </SupportStack.Navigator>
-  );
-};
+const SupportStackNavigator = () => (
+  <SupportStack.Navigator screenOptions={driverStackOptions}>
+    <SupportStack.Screen name="SupportTickets" component={SupportListScreen} options={{ title: 'Support' }} />
+    <SupportStack.Screen name="SupportTicketDetails" component={SupportTicketDetailsScreen} options={{ title: 'Ticket details' }} />
+    <SupportStack.Screen name="NewSupportTicket" component={SupportNewTicketScreen} options={{ title: 'New ticket' }} />
+    <SupportStack.Screen name="Feedback" component={FeedbackScreen} options={{ title: 'Share feedback' }} />
+    <SupportStack.Screen name="Help" component={HelpScreen} options={{ title: 'Help center' }} />
+  </SupportStack.Navigator>
+);
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -344,11 +171,12 @@ const MainTabsNavigator = () => {
           borderTopColor: colors.border,
           paddingTop: 8,
           paddingBottom: Math.max(insets.bottom, 8),
-          height: 60 + insets.bottom,
+          height: 72 + insets.bottom,
         },
         tabBarLabelStyle: {
           fontWeight: "600" as const,
-          fontSize: 11,
+          fontSize: 15,
+          lineHeight: 20,
         },
         tabBarIcon: ({ color, size }) => {
           const iconName =
@@ -444,32 +272,10 @@ export const AppNavigator = () => {
 };
 
 const styles = StyleSheet.create({
-  headerLogo: {
-    height: 32,
-    width: 180,
-    resizeMode: "contain",
-  },
-  headerIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 22,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  appVersion: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 10,
-    fontWeight: "500" as const,
-    letterSpacing: 0,
-  },
+  headerRow: { minHeight: 72, paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  headerLogo: { width: 142, height: 42, resizeMode: 'contain', flexShrink: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerIconButton: { width: 44, height: 44, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.10)' },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingBottom: 12 },
+  detailTitle: { flex: 1, fontSize: 21, fontWeight: '600', color: '#FFFFFF' },
 });

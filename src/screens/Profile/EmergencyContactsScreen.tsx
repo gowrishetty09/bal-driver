@@ -1,5 +1,6 @@
 import React,{useCallback,useState} from 'react';
-import {Alert,Linking,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import {useFocusEffect} from '@react-navigation/native';
 import {Ionicons} from '@expo/vector-icons';
 import {addEmergencyContact,EmergencyContact,getEmergencyContacts,removeEmergencyContact} from '../../api/emergencyContacts';

@@ -1,13 +1,6 @@
 import React, { useCallback } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -151,11 +144,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   statusBadgeText: {
     color: colors.textInverse,
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   jobId: {
     fontSize: typography.subheading,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.text,
   },
   subtle: {
@@ -184,7 +177,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   eta: {
     fontSize: typography.body,
     color: colors.primary,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
   },
   tapHint: {
     fontSize: typography.caption,

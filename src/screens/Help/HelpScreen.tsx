@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Linking,
-} from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity, Linking } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
 import { useTheme, ThemeColors } from '../../context/ThemeContext';
@@ -313,7 +307,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 12,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.muted,
     textAlign: 'center',
     marginTop: 8,
@@ -335,7 +329,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 8,
   },
   quickActionText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: colors.textInverse,
   },
@@ -371,7 +365,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginRight: 12,
   },
   sectionTitleText: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.text,
     fontWeight: '600',
     flex: 1,
@@ -386,9 +380,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderTopColor: colors.border,
   },
   contentLine: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.muted,
-    lineHeight: 22,
+    lineHeight: 26,
     marginBottom: 4,
   },
   contactCard: {
@@ -406,7 +400,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginBottom: 8,
   },
   contactText: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.muted,
     marginBottom: 16,
   },
@@ -417,7 +411,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 10,
   },
   contactInfo: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.text,
   },
   bottomPadding: {

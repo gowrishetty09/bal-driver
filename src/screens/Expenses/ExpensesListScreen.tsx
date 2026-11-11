@@ -1,13 +1,6 @@
 import React, { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -169,7 +162,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.text,
   },
   subtitle: {
@@ -185,7 +178,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   addButtonText: {
     color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     fontSize: typography.caption,
   },
   helperText: {
@@ -208,12 +201,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   cardLabel: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
   },
   cardAmount: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyBold,
+    fontWeight: '700', fontFamily: typography.fontFamilyBold,
     color: colors.brandGold,
   },
   cardText: {
@@ -243,7 +236,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   statusText: {
     color: colors.textInverse,
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   statusPending: {
     backgroundColor: colors.brandGold,

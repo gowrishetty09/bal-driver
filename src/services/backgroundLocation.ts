@@ -1,4 +1,5 @@
 import axios from 'axios';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
@@ -8,6 +9,9 @@ import { getLocationSession } from './locationSession';
 
 export const DRIVER_BACKGROUND_LOCATION_TASK = 'bal-driver-background-location';
 export const READY_FOR_RIDES_TRACKING = '__ready_for_rides__';
+// Expo Go cannot run native background location, including passive permission checks.
+export const supportsBackgroundLocation = Platform.OS !== 'web'
+  && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 const BACKGROUND_LOCATION_DISCLOSURE_KEY = 'backgroundLocationDisclosureAcceptedV2';
 const ACTIVE_BACKGROUND_BOOKING_ID_KEY = 'activeBackgroundLocationBookingId';
 const PENDING_KEY = 'driverPendingLocationV2';
@@ -51,6 +55,7 @@ export function locationSample(location: Location.LocationObject): TrackingSampl
   };
 }
 export async function publishLocation(sample: TrackingSample): Promise<void> {
+  if (!supportsBackgroundLocation) return;
   const revision = ++sampleVersion;
   listeners.forEach(listener => listener({ sample }));
   pending = sample;
@@ -59,6 +64,7 @@ export async function publishLocation(sample: TrackingSample): Promise<void> {
   await flushPendingLocation();
 }
 export async function flushPendingLocation(): Promise<void> {
+  if (!supportsBackgroundLocation) return;
   if (sending) return sending;
   if (Date.now() - lastRequestAt < 4000) return;
   sending = (async () => {
@@ -135,7 +141,7 @@ export async function requestForegroundLocationPermissionWithDisclosure(): Promi
 }
 
 export async function ensureBackgroundLocationPermission(): Promise<boolean> {
-  if (Platform.OS === 'web' || AppState.currentState !== 'active') return false;
+  if (!supportsBackgroundLocation || AppState.currentState !== 'active') return false;
   if (!await TaskManager.isAvailableAsync()) return false;
   if (!await confirmBackgroundLocationDisclosure()) return false;
   let foreground = await requestForegroundLocationPermissionWithDisclosure();
@@ -162,11 +168,12 @@ export function configureBackgroundTracking(bookingId: string | null, requestPer
       await AsyncStorage.removeItem(PENDING_KEY);
       await AsyncStorage.removeItem(STATUS_KEY);
       lastRequestAt = 0;
-      if (await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK)) {
+      if (supportsBackgroundLocation && await Location.hasStartedLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK)) {
         await Location.stopLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK);
       }
       return false;
     }
+    if (!supportsBackgroundLocation) return false;
     const granted = requestPermission ? await ensureBackgroundLocationPermission()
       : (await Location.getBackgroundPermissionsAsync()).status === 'granted';
     if (revision !== lifecycleVersion) return false;
@@ -196,7 +203,7 @@ export function configureBackgroundTracking(bookingId: string | null, requestPer
   return result;
 }
 
-TaskManager.defineTask(DRIVER_BACKGROUND_LOCATION_TASK,
+if (supportsBackgroundLocation) TaskManager.defineTask(DRIVER_BACKGROUND_LOCATION_TASK,
   async ({ data, error }: TaskManager.TaskManagerTaskBody<{locations?: Location.LocationObject[]}>) => {
     if (error) { await report({ error: error.message }); return; }
     const bookingId = await AsyncStorage.getItem(ACTIVE_BACKGROUND_BOOKING_ID_KEY);

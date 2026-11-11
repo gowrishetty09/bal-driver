@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from './AppText';
 import { Ionicons } from "@expo/vector-icons";
 import { startAssignmentAlarm, stopAssignmentAlarm } from "../services/assignmentAlarm";
 
@@ -159,20 +160,20 @@ const createStyles = (colors: ThemeColors) =>
     badgeText: {
       color: colors.brandNavy,
       fontSize: typography.caption,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
     },
     ref: {
       flex: 1,
       textAlign: "right",
       color: colors.text,
       fontSize: typography.caption,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
     },
     route: {
       marginTop: 10,
       color: colors.text,
       fontSize: typography.body,
-      lineHeight: 20,
+      lineHeight: 24,
     },
     metaRow: {
       marginTop: 10,
@@ -206,7 +207,7 @@ const createStyles = (colors: ThemeColors) =>
     secondaryLabel: {
       color: colors.text,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     primaryButton: {
       flex: 1,
@@ -218,6 +219,6 @@ const createStyles = (colors: ThemeColors) =>
     primaryLabel: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
     },
   });

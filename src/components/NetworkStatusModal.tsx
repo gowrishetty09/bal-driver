@@ -1,12 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Animated,
-} from 'react-native';
+import { Modal, View, StyleSheet, ActivityIndicator, Animated } from 'react-native';
+import { AppText as Text } from './AppText';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
@@ -160,11 +154,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   message: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666666',
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 20,
+    lineHeight: 24,
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -172,7 +166,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
-    fontSize: 13,
+    fontSize: 16,
     color: colors.brandGold,
     fontWeight: '500',
   },
@@ -190,12 +184,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   connectedIcon: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#FFFFFF',
     fontWeight: '700',
   },
   connectedText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '600',
   },

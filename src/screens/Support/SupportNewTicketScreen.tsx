@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
@@ -147,7 +148,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   label: {
     marginTop: 16,
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
   },
   input: {
@@ -195,7 +196,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   optionChipLabelSelected: {
     color: colors.brandGold,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
   helperText: {
     marginTop: 4,
@@ -215,6 +216,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   submitLabel: {
     color: colors.brandGold,
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
 });

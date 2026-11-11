@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useState } from "react";
-import { Alert, AppState, Pressable, Text, View } from "react-native";
+import { Alert, AppState, Pressable, View } from 'react-native';
+import { AppText as Text } from './AppText';
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { apiClient } from "../api/client";
 import { useTheme } from "../context/ThemeContext";

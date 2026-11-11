@@ -1,18 +1,20 @@
 import React, { useCallback } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from './AppText';
 
 import { useLocationService } from '../hooks/useLocationService';
 import { useTheme, ThemeColors } from '../context/ThemeContext';
 import { typography } from '../theme/typography';
+import { supportsBackgroundLocation } from '../services/backgroundLocation';
 
 export const LocationStatusBanner: React.FC = () => {
   const { permissionStatus, isSharingLocation, requestPermission, trackingError, backgroundTrackingActive, backgroundTrackingStarting, isHighFrequencyMode } = useLocationService();
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
-  const backgroundUnavailable = isHighFrequencyMode && !backgroundTrackingActive;
+  const backgroundUnavailable = supportsBackgroundLocation && isHighFrequencyMode && !backgroundTrackingActive;
   const permissionGranted = permissionStatus === 'granted';
-  const showBanner = backgroundUnavailable || Boolean(trackingError) || !permissionGranted || !isSharingLocation;
+  const showBanner = supportsBackgroundLocation && (backgroundUnavailable || Boolean(trackingError) || !permissionGranted || !isSharingLocation);
 
   const isDenied = permissionStatus === 'denied';
   const isUndetermined = permissionStatus === 'undetermined';
@@ -46,7 +48,7 @@ export const LocationStatusBanner: React.FC = () => {
     return null;
   }
 
-  const showActionButton = !backgroundTrackingStarting && (backgroundUnavailable || !permissionGranted || Boolean(trackingError));
+  const showActionButton = supportsBackgroundLocation && !backgroundTrackingStarting && (backgroundUnavailable || !permissionGranted || Boolean(trackingError));
 
   return (
     <View style={[styles.container, permissionGranted ? styles.paused : styles.warning]}>
@@ -88,7 +90,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   title: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.text,
   },
   subtitle: {
@@ -106,6 +108,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   buttonLabel: {
     color: colors.textInverse,
     fontSize: typography.caption,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
   },
 });

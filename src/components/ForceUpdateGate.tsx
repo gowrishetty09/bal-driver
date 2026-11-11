@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from './AppText';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 
@@ -194,8 +195,8 @@ const createStyles = (colors: ThemeColors) =>
     },
     message: {
       color: colors.textSecondary,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: 18,
+      lineHeight: 26,
       textAlign: 'center',
       marginBottom: 24,
     },
@@ -210,7 +211,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     buttonText: {
       color: '#fff',
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '700',
     },
   });

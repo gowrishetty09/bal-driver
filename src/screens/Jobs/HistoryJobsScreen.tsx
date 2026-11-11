@@ -1,14 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-} from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View, TextInput } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -198,7 +190,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   amount: {
     fontSize: typography.body,
-    fontFamily: typography.fontFamilyMedium,
+    fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     color: colors.accent,
     minWidth: 84,
     textAlign: "right",
@@ -242,7 +234,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   clearButtonText: {
     color: colors.muted,
-    fontSize: 16,
+    fontSize: 18,
   },
   loaderContainer: {
     alignItems: "center",

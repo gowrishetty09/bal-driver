@@ -2,8 +2,8 @@ export const typography = {
     fontFamilyRegular: 'System',
     fontFamilyMedium: 'System',
     fontFamilyBold: 'System',
-    heading: 18,
-    subheading: 16,
-    body: 13,
-    caption: 12,
+    heading: 26,
+    subheading: 21,
+    body: 18,
+    caption: 16,
 };

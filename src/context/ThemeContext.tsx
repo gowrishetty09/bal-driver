@@ -71,10 +71,10 @@ export const lightTheme: ThemeColors = {
   
   // Text colors
   text: '#333333',
-  textSecondary: '#666666',
-  textMuted: '#999999',
+  textSecondary: '#4B5563',
+  textMuted: '#596273',
   textInverse: '#FFFFFF',
-  muted: '#999999',
+  muted: '#596273',
   
   // UI elements
   border: '#E5E5E5',
@@ -102,7 +102,7 @@ export const lightTheme: ThemeColors = {
   // Tab bar
   tabBarBackground: '#FFFFFF',
   tabBarActive: '#151e2d',
-  tabBarInactive: '#999999',
+  tabBarInactive: '#596273',
   
   // Buttons
   buttonPrimary: '#151e2d',
@@ -130,7 +130,7 @@ export const darkTheme: ThemeColors = {
   // Text colors
   text: '#FFFFFF',
   textSecondary: '#B3B3B3',
-  textMuted: '#666666',
+  textMuted: '#B0B8C4',
   textInverse: '#151e2d',
   muted: '#919191',
   
@@ -160,7 +160,7 @@ export const darkTheme: ThemeColors = {
   // Tab bar
   tabBarBackground: '#1A1A1A',
   tabBarActive: '#BD9250',
-  tabBarInactive: '#666666',
+  tabBarInactive: '#B0B8C4',
   
   // Buttons
   buttonPrimary: '#BD9250',

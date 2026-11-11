@@ -1,13 +1,8 @@
 import { RideOffersCard } from "../../components/RideOffersCard";
 import { RideReadinessCard } from "../../components/RideReadinessCard";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
@@ -81,12 +76,11 @@ export const HomeDashboardScreen: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     // Trigger refresh on all job types
-    await Promise.all([
-      active.refresh?.(),
-      upcoming.refresh?.(),
-      history.refresh?.(),
-    ]);
-    setIsRefreshing(false);
+    try {
+      await Promise.all([active.refresh?.(), upcoming.refresh?.(), history.refresh?.()]);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [active, upcoming, history]);
 
   const stats = useMemo(() => {
@@ -183,10 +177,20 @@ export const HomeDashboardScreen: React.FC = () => {
     <Screen
       scrollable
       contentContainerStyle={styles.container}
-      edges={["top"]}
+      edges={["left", "right"]}
       refreshing={isRefreshing}
       onRefresh={handleRefresh}
     >
+      <View style={styles.headerRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerSubtitle}>YOUR DRIVER DASHBOARD</Text>
+          <Text style={styles.headerTitle}>{user?.name ? 'Hello, ' + user.name.split(' ')[0] : 'Welcome back'}</Text>
+          <Text style={styles.welcomeDetail}>Your day on the road, at a glance.</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="View your rides" style={styles.viewAllPill} onPress={() => goToRides()}>
+          <Ionicons name="arrow-forward" size={22} color={colors.brandNavy} />
+        </Pressable>
+      </View>
       <LocationStatusBanner />
       <RideReadinessCard />
       <RideOffersCard />
@@ -205,19 +209,6 @@ export const HomeDashboardScreen: React.FC = () => {
           }
         />
       ) : null}
-
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.headerTitle}>Home</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {user?.name ? `Welcome, ${user.name}` : "Your dashboard"}
-          </Text>
-        </View>
-        <Pressable style={styles.viewAllPill} onPress={() => goToRides()}>
-          <Ionicons name="car-outline" size={16} color={colors.brandNavy} />
-          <Text style={styles.viewAllPillText}>Rides</Text>
-        </Pressable>
-      </View>
 
       {isLoading ? (
         <View style={styles.loadingRow}>
@@ -273,7 +264,8 @@ export const HomeDashboardScreen: React.FC = () => {
 
         {nextUpcomingJobs.length === 0 ? (
           <View style={styles.compactEmpty}>
-            <Text style={styles.emptyText}>No upcoming rides.</Text>
+            <Ionicons name="calendar-outline" size={25} color={colors.brandGold} />
+            <View style={{ flex: 1 }}><Text style={styles.emptyTitle}>Your schedule is clear</Text><Text style={styles.emptyText}>New assigned rides will appear here.</Text></View>
           </View>
         ) : (
           <View style={styles.compactList}>
@@ -310,7 +302,7 @@ export const HomeDashboardScreen: React.FC = () => {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>This week's rides</Text>
+          <Text style={styles.sectionTitle}>Your week</Text>
           <Pressable onPress={() => goToRides("HISTORY")}>
             <Text style={styles.sectionAction}>View history</Text>
           </Pressable>
@@ -322,15 +314,13 @@ export const HomeDashboardScreen: React.FC = () => {
               const heightPct = (d.value / weeklyCounts.max) * 100;
               const isToday = d.key === dayKey(new Date());
               return (
-                <View key={d.label} style={styles.chartCol}>
-                  {d.value > 0 && (
-                    <Text style={styles.chartValue}>{d.value}</Text>
-                  )}
+                <View key={d.key} style={styles.chartCol}>
+                  <Text style={styles.chartValue}>{d.value}</Text>
                   <View style={styles.chartBarWrap}>
                     <View
                       style={[
                         styles.chartBar,
-                        { height: `${Math.max(8, heightPct)}%` },
+                        { height: `${heightPct}%` },
                         isToday && styles.chartBarToday,
                       ]}
                     />
@@ -381,23 +371,22 @@ export const HomeDashboardScreen: React.FC = () => {
                   })
                 }
               >
-                <View style={styles.recentLeft}>
-                  <Text style={styles.recentRef} numberOfLines={1}>
-                    {formatBookingRef(job.reference || job.id)}
-                  </Text>
-                  <Text style={styles.recentRoute} numberOfLines={1}>
-                    {(job.pickup?.addressLine ?? "—") +
-                      " → " +
-                      (job.dropoff?.addressLine ?? "—")}
-                  </Text>
+                <View style={styles.rideCardTop}>
+                  <Text style={styles.recentRef}>{formatBookingRef(job.reference || job.id)}</Text>
+                  <View style={styles.statusBadge}><Text style={styles.recentStatus}>{job.status.replace(/_/g, ' ')}</Text></View>
                 </View>
-                <View style={styles.recentRight}>
-                  <Text style={styles.recentStatus}>{job.status}</Text>
-                  <Text style={styles.recentTime}>
-                    {job.scheduledTime
-                      ? new Date(job.scheduledTime).toLocaleString("en-MY", { hour12: false })
-                      : "—"}
-                  </Text>
+                <View style={styles.routeLine}>
+                  <View style={[styles.routeDot, { backgroundColor: colors.brandGold }]} />
+                  <Text style={styles.recentRoute} numberOfLines={2}>{job.pickup?.addressLine ?? 'Pickup location'}</Text>
+                </View>
+                <View style={styles.routeLine}>
+                  <View style={[styles.routeDot, { backgroundColor: colors.textSecondary }]} />
+                  <Text style={styles.recentRoute} numberOfLines={2}>{job.dropoff?.addressLine ?? 'Drop-off location'}</Text>
+                </View>
+                <View style={styles.rideCardFooter}>
+                  <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.recentTime}>{job.scheduledTime ? new Date(job.scheduledTime).toLocaleString('en-MY', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'Time to be confirmed'}</Text>
+                  <Ionicons name="arrow-forward" size={19} color={colors.textSecondary} />
                 </View>
               </Pressable>
             ))}
@@ -441,17 +430,19 @@ const StatCard: React.FC<{
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
 }> = ({ title, value, icon, accent, onPress, colors, styles }) => {
+  const { width, fontScale } = useWindowDimensions();
+  const cardWidth = width < 360 || fontScale > 1.2 ? { width: "100%" as const } : null;
   const content = (
-    <View style={[styles.statCard, { borderColor: accent }]}>
+    <View style={styles.statCard}>
       <View style={styles.statInline}>
         <View style={[styles.statIconWrap, { backgroundColor: accent }]}>
           <Ionicons name={icon} size={18} color={colors.brandNavy} />
         </View>
         <View style={styles.statTextBlock}>
-          <Text style={styles.statTitle} numberOfLines={1}>
+          <Text style={styles.statTitle}>
             {title}
           </Text>
-          <Text style={styles.statValue} numberOfLines={1}>
+          <Text style={styles.statValue}>
             {value}
           </Text>
         </View>
@@ -459,12 +450,13 @@ const StatCard: React.FC<{
     </View>
   );
 
-  if (!onPress) return <View style={styles.statCardShell}>{content}</View>;
+  if (!onPress) return <View style={[styles.statCardShell, cardWidth]}>{content}</View>;
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.statCardShell,
+        cardWidth,
         pressed && { opacity: 0.92 },
       ]}
       onPress={onPress}
@@ -476,40 +468,32 @@ const StatCard: React.FC<{
 
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    welcomeDetail: { marginTop: 6, fontSize: 16, color: colors.textSecondary, lineHeight: 23 },
+    emptyTitle: { fontSize: 17, fontWeight: '600', color: colors.text, marginBottom: 4 },
+    rideCardTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    statusBadge: { backgroundColor: colors.cardSecondary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+    routeLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    routeDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
+    rideCardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.divider },
     container: {
-      paddingHorizontal: 16,
-      paddingTop: 0,
+      paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20,
     },
     headerRow: {
-      marginTop: 10,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
+      marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     },
     headerTitle: {
-      fontSize: typography.heading,
-      fontFamily: typography.fontFamilyBold,
-      color: colors.text,
+      fontSize: 28, fontWeight: '700', color: colors.text,
     },
     headerSubtitle: {
-      marginTop: 2,
-      fontSize: typography.caption,
-      color: colors.muted,
+      marginBottom: 6, fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.textSecondary,
     },
     viewAllPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      backgroundColor: colors.brandGold,
-      borderRadius: 999,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandGold,
     },
     viewAllPillText: {
       color: colors.brandNavy,
       fontSize: typography.caption,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     loadingRow: {
       marginTop: 12,
@@ -533,15 +517,11 @@ const createStyles = (colors: ThemeColors) =>
       minWidth: 150,
     },
     statCard: {
-      backgroundColor: colors.card,
-      borderRadius: 14,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderWidth: 1,
+      minHeight: 142, backgroundColor: colors.card, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: colors.border,
     },
     statInline: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: "column",
+      alignItems: "flex-start",
       gap: 10,
     },
     statIconWrap: {
@@ -552,7 +532,7 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: "center",
     },
     statTextBlock: {
-      flex: 1,
+      alignSelf: "stretch",
       minWidth: 0,
     },
     statTitle: {
@@ -560,29 +540,26 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.muted,
     },
     statValue: {
-      marginTop: 2,
-      fontSize: 18,
-      fontFamily: typography.fontFamilyBold,
-      color: colors.text,
+      marginTop: 4, fontSize: 30, fontWeight: '700', color: colors.text,
     },
     section: {
-      marginTop: 16,
+      marginTop: 26,
     },
     sectionHeader: {
       flexDirection: "row",
+      flexWrap: "wrap",
+      columnGap: 12,
       alignItems: "center",
       justifyContent: "space-between",
       marginBottom: 10,
     },
     sectionTitle: {
       fontSize: typography.subheading,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
       color: colors.text,
     },
     sectionAction: {
-      fontSize: typography.caption,
-      color: colors.highlight,
-      fontFamily: typography.fontFamilyMedium,
+      fontSize: 15, fontWeight: '600', color: colors.textSecondary, paddingVertical: 12,
     },
     chartCard: {
       backgroundColor: colors.card,
@@ -618,19 +595,19 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.primary,
     },
     chartValue: {
-      fontSize: 11,
-      fontFamily: typography.fontFamilyBold,
+      fontSize: 14,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
       color: colors.text,
       marginBottom: 4,
     },
     chartLabel: {
       marginTop: 8,
-      fontSize: 10,
+      fontSize: 14,
       color: colors.muted,
     },
     chartLabelToday: {
       color: colors.primary,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
     },
     emptyCard: {
       backgroundColor: colors.card,
@@ -644,11 +621,7 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: typography.body,
     },
     compactEmpty: {
-      backgroundColor: colors.card,
-      borderRadius: 14,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
+      flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.border,
     },
     compactList: {
       gap: 8,
@@ -678,20 +651,13 @@ const createStyles = (colors: ThemeColors) =>
     primaryButtonText: {
       color: colors.textInverse,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
     recentList: {
       gap: 10,
     },
     recentItem: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      flexDirection: "row",
-      justifyContent: "space-between",
-      gap: 10,
+      backgroundColor: colors.card, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: colors.border, gap: 12,
     },
     recentItemPressed: {
       transform: [{ scale: 0.99 }],
@@ -705,22 +671,16 @@ const createStyles = (colors: ThemeColors) =>
     recentRef: {
       fontSize: typography.caption,
       color: colors.highlight,
-      fontFamily: typography.fontFamilyBold,
+      fontWeight: '700', fontFamily: typography.fontFamilyBold,
     },
     recentRoute: {
-      marginTop: 4,
-      fontSize: typography.caption,
-      color: colors.muted,
+      flex: 1, fontSize: 16, lineHeight: 23, color: colors.text,
     },
     recentStatus: {
-      fontSize: typography.caption,
-      color: colors.text,
-      fontFamily: typography.fontFamilyMedium,
+      fontSize: 12, fontWeight: '600', color: colors.textSecondary,
     },
     recentTime: {
-      marginTop: 4,
-      fontSize: 10,
-      color: colors.muted,
+      flex: 1, fontSize: 14, color: colors.textSecondary,
     },
     quickRow: {
       marginTop: 14,
@@ -741,6 +701,6 @@ const createStyles = (colors: ThemeColors) =>
     quickButtonText: {
       color: colors.brandNavy,
       fontSize: typography.body,
-      fontFamily: typography.fontFamilyMedium,
+      fontWeight: '600', fontFamily: typography.fontFamilyMedium,
     },
   });

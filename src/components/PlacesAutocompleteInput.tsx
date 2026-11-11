@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AppText as Text } from './AppText';
 
 import { fetchPlacePredictions, PlacePrediction } from '../services/googlePlaces';
 import { useTheme, ThemeColors } from '../context/ThemeContext';

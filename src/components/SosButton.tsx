@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { AppText as Text } from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useSos } from '../hooks/useSos';
@@ -11,7 +12,7 @@ export const SosButton: React.FC = () => {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   return (
-    <Pressable style={styles.button} onPress={openSos} hitSlop={10}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Emergency assistance" style={styles.button} onPress={openSos} hitSlop={4}>
       <Ionicons name="alert-circle" size={18} color={colors.brandGold} />
       <Text style={styles.label}>SOS</Text>
     </Pressable>
@@ -20,6 +21,7 @@ export const SosButton: React.FC = () => {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

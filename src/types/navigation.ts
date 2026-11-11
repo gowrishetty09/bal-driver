@@ -48,6 +48,7 @@ export type ExpensesStackParamList = {
 };
 
 export type ProfileStackParamList = {
+    DeleteAccount: undefined;
     DriverProfile: undefined;
     Compliance: undefined;
     EmergencyContacts: undefined;
